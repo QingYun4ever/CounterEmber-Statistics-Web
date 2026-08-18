@@ -1,0 +1,113 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink-900: #10131c;
+  --color-ink-700: #333a4d;
+  --color-ink-500: #626c85;
+  --color-ink-400: #8a93a8;
+  --color-ink-300: #aeb6c7;
+
+  --color-accent: #4f7dff;
+  --color-accent-soft: #7c8cff;
+  --color-violet: #b15cff;
+  --color-gold: #f5b544;
+  --color-good: #2fa36b;
+  --color-bad: #e5566a;
+
+  --color-ct: #4f7dff;
+  --color-t: #f0a23c;
+
+  --radius-card: 1rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #f7f8fc;
+  color: var(--color-ink-900);
+  font-feature-settings: 'cv02', 'cv03', 'cv04';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Two fixed, heavily blurred blooms. Everything else floats above them. */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after {
+  content: '';
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  border-radius: 9999px;
+  filter: blur(120px);
+}
+.aurora::before {
+  top: -14rem;
+  right: -10rem;
+  background: radial-gradient(circle, rgb(124 140 255 / 0.34), transparent 68%);
+}
+.aurora::after {
+  bottom: -18rem;
+  left: -12rem;
+  background: radial-gradient(circle, rgb(183 140 255 / 0.28), transparent 68%);
+}
+
+.glass {
+  background: rgb(255 255 255 / 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: 0 8px 32px rgb(31 38 135 / 0.08);
+  border-radius: var(--radius-card);
+}
+
+.glass-soft {
+  background: rgb(255 255 255 / 0.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 0.75rem;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Staggered entrance. --i is set inline per card. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
+
+::selection {
+  background: rgb(79 125 255 / 0.18);
+}
