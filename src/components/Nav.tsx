@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/', label: '总览' },
   { href: '/matches', label: '比赛' },
   { href: '/players', label: '排行' },
+  { href: '/download', label: '下载' },
   { href: '/me', label: '我' },
 ]
 

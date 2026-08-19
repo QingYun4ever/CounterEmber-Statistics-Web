@@ -23,9 +23,10 @@ ENV NODE_ENV=production \
     PORT=3100 \
     HOSTNAME=0.0.0.0 \
     CESTATS_DB=/data/cestats.db \
-    CESTATS_SKIN_CACHE=/data/skins
+    CESTATS_SKIN_CACHE=/data/skins \
+    CESTATS_MOD_DIR=/data/mods
 
-RUN useradd -m -u 1001 cestats && mkdir -p /data && chown cestats /data
+RUN useradd -m -u 1001 cestats && mkdir -p /data/mods /data/skins && chown -R cestats /data
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./

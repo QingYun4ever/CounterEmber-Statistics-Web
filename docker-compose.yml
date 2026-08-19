@@ -14,6 +14,8 @@ services:
       CESTATS_SITE_URL: ${CESTATS_SITE_URL:-http://127.0.0.1:3100}
       CESTATS_DB: /data/cestats.db
       CESTATS_SKIN_CACHE: /data/skins
+      # Upload the jars from mod/dist/ here and /download lists them automatically.
+      CESTATS_MOD_DIR: /data/mods
     volumes:
       - cestats-data:/data
     healthcheck:
