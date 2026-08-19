@@ -1,3 +1,12 @@
+/**
+ * Issues a one-time pairing code from the command line.
+ *
+ * The normal way to do this is the operator console at `/admin`, which does the same thing with a
+ * copy button and a countdown. This exists for headless boxes and scripting; it talks to the same
+ * endpoint using the `x-admin-key` header instead of a browser session.
+ *
+ *   npm run create-pair-code -- --url https://你的域名 --key "$CESTATS_ADMIN_KEY" --player 玩家名
+ */
 export {}
 
 const arg = (name: string, fallback?: string): string | undefined => {

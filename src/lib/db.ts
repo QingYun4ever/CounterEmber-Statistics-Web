@@ -228,18 +228,20 @@ function hashPairingCode(code: string): string {
 }
 
 export function issuePairingCode(player: string, now = Date.now()): {
+  id: string
   code: string
   player: string
   expiresAt: number
 } {
   const db = getDb()
   const code = randomBytes(8).toString('hex').toUpperCase()
+  const id = hashPairingCode(code)
   const expiresAt = now + PAIRING_CODE_TTL_MS
   db.prepare(
     `INSERT INTO pairing_codes (code_hash, player, created_at, expires_at, attempts, used_at)
      VALUES (?, ?, ?, ?, 0, NULL)`,
-  ).run(hashPairingCode(code), player, now, expiresAt)
-  return { code, player, expiresAt }
+  ).run(id, player, now, expiresAt)
+  return { id, code, player, expiresAt }
 }
 
 /** Recent codes for the operator console. Sweeps rows nobody can act on anymore first. */

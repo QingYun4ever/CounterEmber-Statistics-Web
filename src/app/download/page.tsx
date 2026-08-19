@@ -102,13 +102,23 @@ export default function DownloadPage() {
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">3</span>
               <span>
-                官方统计服务器不需要修改。如是自部署统计站点，进游戏后用{' '}
-                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats</code>{' '}
-                命令填站点地址和上传密钥；装了 Mod Menu 的话也可以在它的设置界面里改。
+                进游戏后向站长要一个<strong className="font-medium">一次性配对码</strong>，执行{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">
+                  /cestats pair &lt;配对码&gt;
+                </code>
+                。配对码 15 分钟内有效、只能用一次，而且只有你这个 ID 能用；配对后本机才会上传数据。
               </span>
             </li>
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">4</span>
+              <span>
+                官方统计服务器不需要改地址。如是自部署统计站点，用{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats url</code>{' '}
+                填自己的站点地址再配对；装了 Mod Menu 的话也可以在它的设置界面里改。
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="num shrink-0 text-ink-300">5</span>
               <span>
                 连服打一把。赛后播报解析完会自动上传，比赛随后出现在{' '}
                 <strong className="font-medium">比赛</strong> 页。

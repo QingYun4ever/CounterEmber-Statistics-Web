@@ -7,9 +7,15 @@ import type { DeviceTokenSummary, PairingCodeSummary } from '@/lib/db'
 import { fmtDate, relative } from '@/lib/format'
 import { Card, Pill, SectionTitle } from './ui'
 
-type IssuedCode = { code: string; player: string; expiresAt: number }
+type IssuedCode = { id: string; code: string; player: string; expiresAt: number }
 
-/** Ticks once a second, but only after mount so the server render has nothing time-dependent. */
+/**
+ * Ticks once a second, but stays null until mount.
+ *
+ * Nothing time-dependent may render on the server here: the operator's browser and the container
+ * can sit in different timezones, and a formatted date that differs between the two renders is a
+ * hydration mismatch. So every timestamp in this file waits for the clock.
+ */
 function useClock(): number | null {
   const [now, setNow] = useState<number | null>(null)
   useEffect(() => {
@@ -18,6 +24,11 @@ function useClock(): number | null {
     return () => clearInterval(timer)
   }, [])
   return now
+}
+
+/** A timestamp that only appears once the client clock exists. */
+function At({ ms, now }: { ms: number; now: number | null }) {
+  return <span className="num text-xs text-ink-400">{now === null ? '—' : fmtDate(ms)}</span>
 }
 
 function CopyButton({
@@ -118,7 +129,7 @@ export default function AdminConsole({
         method: 'POST',
         body: JSON.stringify({ player: name }),
       })
-      setIssued({ code: result.code, player: result.player, expiresAt: result.expiresAt })
+      setIssued(result)
       setPlayer('')
       await reload()
     } catch (e) {
@@ -133,7 +144,7 @@ export default function AdminConsole({
     setError(null)
     try {
       await adminFetch('/api/admin/pairing', { method: 'DELETE', body: JSON.stringify({ id }) })
-      if (issued && codes.some((c) => c.id === id && c.player === issued.player)) setIssued(null)
+      if (issued?.id === id) setIssued(null)
       await reload()
     } catch (e) {
       handle(e)
@@ -142,11 +153,21 @@ export default function AdminConsole({
     }
   }
 
-  async function revokeDevice(id: string) {
-    setBusy(id)
+  /** Revoking cannot be undone from here — the player needs a fresh code — so it asks first. */
+  async function revokeDevice(device: DeviceTokenSummary) {
+    const confirmed = window.confirm(
+      `撤销 ${device.player} 的这台设备（${device.installId.slice(0, 8)}）？\n` +
+        '这台客户端会立刻无法上传，要恢复只能重新发一个配对码。',
+    )
+    if (!confirmed) return
+
+    setBusy(device.id)
     setError(null)
     try {
-      await adminFetch('/api/admin/devices', { method: 'POST', body: JSON.stringify({ id }) })
+      await adminFetch('/api/admin/devices', {
+        method: 'POST',
+        body: JSON.stringify({ id: device.id }),
+      })
       await reload()
     } catch (e) {
       handle(e)
@@ -276,7 +297,7 @@ export default function AdminConsole({
                         ) : null}
                       </td>
                       <td className="num px-5 py-3 text-xs text-ink-400">
-                        {fmtDate(code.createdAt)}
+                        <At ms={code.createdAt} now={now} />
                       </td>
                       <td className="px-5 py-3 text-right">
                         {code.usedAt === null && !expired ? (
@@ -341,23 +362,23 @@ export default function AdminConsole({
                       {device.installId.slice(0, 8)}
                     </td>
                     <td className="num px-5 py-3 text-xs text-ink-400">
-                      {fmtDate(device.createdAt)}
+                      <At ms={device.createdAt} now={now} />
                     </td>
                     <td className="num px-5 py-3 text-xs text-ink-400">
-                      {now === null ? fmtDate(device.lastSeenAt) : relative(device.lastSeenAt)}
+                      {now === null ? '—' : relative(device.lastSeenAt)}
                     </td>
                     <td className="px-5 py-3 text-right">
                       {device.revokedAt === null ? (
                         <button
                           type="button"
-                          onClick={() => revokeDevice(device.id)}
+                          onClick={() => revokeDevice(device)}
                           disabled={busy === device.id}
                           className="rounded-lg border border-rose-100 bg-rose-50/70 px-3 py-1.5 text-xs font-medium text-bad transition-colors hover:bg-rose-100/70 disabled:opacity-40"
                         >
                           撤销
                         </button>
                       ) : (
-                        <span className="num text-xs text-ink-300">{fmtDate(device.revokedAt)}</span>
+                        <At ms={device.revokedAt} now={now} />
                       )}
                     </td>
                   </tr>
