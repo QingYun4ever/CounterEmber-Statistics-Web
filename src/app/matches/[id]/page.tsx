@@ -20,7 +20,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const { id } = await params
   const data = getMatch(id)
   if (!data) notFound()
-  const { match, players, rounds, kills } = data
+  const { match, players, rounds, kills, uploaders } = data
   const me = await getMe()
 
   const killsByRound = new Map<number, typeof kills>()
@@ -44,7 +44,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="text-[15px] font-semibold text-ink-900">{WINNER_LABEL[match.winner]}</div>
             <div className="mt-0.5 text-xs text-ink-400">
-              {fmtDate(match.ended_at)} · {match.server} · 上报者 {match.uploader}
+              {fmtDate(match.ended_at)} · {match.server} ·{' '}
+              {uploaders.length > 1
+                ? `${uploaders.length} 人上报 ${uploaders.join('、')}`
+                : `上报者 ${uploaders[0] ?? match.uploader}`}
             </div>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">

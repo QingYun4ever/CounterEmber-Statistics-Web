@@ -62,9 +62,10 @@ export async function POST(req: Request) {
 
   // The id is always recomputed here: a buggy client must not be able to create duplicates.
   const match = parsed.data
-  const matchId = computeMatchId(match)
-  const result = saveMatch(match, matchId)
+  const result = saveMatch(match, computeMatchId(match))
 
+  // result.matchId, not the id computed above: an upload folded into an existing match has to
+  // link to the row that actually holds it, or the mod hands the player a dead link.
   const site = process.env.CESTATS_SITE_URL ?? new URL(req.url).origin
-  return NextResponse.json({ ok: true, ...result, url: `${site}/matches/${matchId}` })
+  return NextResponse.json({ ok: true, ...result, url: `${site}/matches/${result.matchId}` })
 }

@@ -100,14 +100,40 @@ export const zMatch = z.object({
 })
 export type Match = z.infer<typeof zMatch>
 
+/** The part of the identity both clients always agree on: the server's own end-of-match table. */
+export type StatLine = Pick<
+  Player,
+  'name' | 'kills' | 'deaths' | 'assists' | 'adr' | 'kast' | 'rating'
+>
+
+function statLines(players: StatLine[]): string {
+  return players
+    .map((p) => `${p.name}:${p.kills}-${p.deaths}-${p.assists}:${p.adr}:${p.kast}:${p.rating.toFixed(2)}`)
+    .sort()
+    .join(',')
+}
+
 /**
  * Deliberately timestamp-free: two clients that watched the same match must derive the same id
  * so the server can dedupe them. The roster plus every exact stat value is unique in practice.
  */
 export function computeMatchId(match: Pick<Match, 'server' | 'players'>): string {
-  const lines = match.players
-    .map((p) => `${p.name}:${p.kills}-${p.deaths}-${p.assists}:${p.adr}:${p.kast}:${p.rating.toFixed(2)}`)
-    .sort()
-    .join(',')
-  return createHash('sha256').update(`${match.server}|${lines}`, 'utf8').digest('hex').slice(0, 16)
+  return createHash('sha256')
+    .update(`${match.server}|${statLines(match.players)}`, 'utf8')
+    .digest('hex')
+    .slice(0, 16)
+}
+
+/**
+ * Identity for merging, as opposed to `computeMatchId`'s identity for storage.
+ *
+ * The difference is `server`, and it matters: the same physical server answers to more than one
+ * hostname (`on.imc.cab` and `on.s.imc.re` were both seen for one match), so two players in the
+ * same game can report different `server` strings and land on different match ids. Everything
+ * else here comes from a single broadcast that every client receives verbatim, which makes the
+ * scoreboard a far stronger merge signal than "uploaded around the same time with a similar
+ * round count" — those are consequences of being the same match, not evidence of it.
+ */
+export function computeMergeKey(players: StatLine[]): string {
+  return createHash('sha256').update(statLines(players), 'utf8').digest('hex').slice(0, 16)
 }

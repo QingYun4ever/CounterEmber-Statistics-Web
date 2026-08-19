@@ -9,6 +9,7 @@
     "start": "next start -p 3100",
     "lint": "tsc --noEmit",
     "import-log": "tsx scripts/import-log.ts",
+    "merge-duplicates": "tsx scripts/merge-duplicates.ts",
     "parse-check": "tsx scripts/parse-check.ts"
   },
   "dependencies": {

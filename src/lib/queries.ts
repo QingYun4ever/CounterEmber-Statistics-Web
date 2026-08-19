@@ -195,7 +195,13 @@ export function getMatch(id: string) {
   const kills = db
     .prepare('SELECT * FROM kill_events WHERE match_id = ? ORDER BY seq')
     .all(id) as KillRow[]
-  return { match, players, rounds, kills }
+  // More than one when several players in the game ran the mod and reported it independently.
+  const uploaders = (
+    db
+      .prepare('SELECT uploader FROM match_uploaders WHERE match_id = ? ORDER BY uploader')
+      .all(id) as { uploader: string }[]
+  ).map((r) => r.uploader)
+  return { match, players, rounds, kills, uploaders }
 }
 
 export function leaderboard(minMatches = 1): PlayerAgg[] {
