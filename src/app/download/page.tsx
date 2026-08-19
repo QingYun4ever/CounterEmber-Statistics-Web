@@ -21,7 +21,7 @@ export default function DownloadPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">下载</h1>
         <p className="mt-1 text-sm text-ink-400">
-          CE Stats 客户端 mod · Fabric · 挑一个和你 Minecraft 版本对得上的
+          CE Stats 客户端 mod · Fabric Mod Loader
         </p>
       </div>
 
@@ -87,8 +87,8 @@ export default function DownloadPage() {
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">1</span>
               <span>
-                装 <strong className="font-medium">Fabric Loader</strong>（0.16.0 以上）和对应版本的{' '}
-                <strong className="font-medium">Fabric API</strong>。这两个是必需的。
+                [必需]装 <strong className="font-medium">Fabric Loader</strong>（0.16.0 以上）和对应版本的{' '}
+                <strong className="font-medium">Fabric API</strong>
               </span>
             </li>
             <li className="flex gap-3">
@@ -96,13 +96,13 @@ export default function DownloadPage() {
               <span>
                 把上面下载的 jar 丢进{' '}
                 <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">.minecraft/mods/</code>。
-                设置界面用的 Cloth Config 已经打包在里面了，不用另外装。
+                设置界面用的 Cloth Config (前置)已经打包在jar内。
               </span>
             </li>
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">3</span>
               <span>
-                进游戏后用{' '}
+                官方统计服务器不需要修改。如是自部署统计站点，进游戏后用{' '}
                 <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats</code>{' '}
                 命令填站点地址和上传密钥；装了 Mod Menu 的话也可以在它的设置界面里改。
               </span>
@@ -117,8 +117,8 @@ export default function DownloadPage() {
           </ol>
 
           <p className="mt-5 border-t border-white/60 pt-4 text-xs text-ink-400">
-            mod 只在客户端运行（<code className="rounded bg-white/70 px-1 py-0.5">environment: client</code>），
-            读的是聊天框里的赛后播报，不读内存也不改游戏行为，服务端不需要装任何东西。需要 Java 21 以上。
+            mod 只在客户端运行，
+            读的是聊天框里的赛后播报，不读内存也不改游戏行为，不存在作弊行为。
           </p>
         </Card>
       </section>
