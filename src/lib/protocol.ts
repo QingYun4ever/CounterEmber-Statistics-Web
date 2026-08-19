@@ -68,16 +68,24 @@ export const zDerived = z.object({
 })
 export type Derived = z.infer<typeof zDerived>
 
-/** kills/deaths/assists/adr/kast/rating come straight from the server's end-of-match table. */
+/**
+ * kills/deaths/assists/adr/kast/rating come straight from the server's end-of-match table.
+ *
+ * The upper bounds are not there to model the game — they are there because the API key is shared
+ * with every player who installs the mod, so "authenticated" does not mean "trustworthy". Without
+ * them the endpoint accepted `60237-19-5052 / ADR 6200 / Rating 44.56`, and roughly 2800 such
+ * matches had to be deleted from the live database (see scripts/purge-junk.ts). Every limit sits
+ * far above anything real: the measured maxima are 32 kills, ADR 240 and Rating 3.82.
+ */
 export const zPlayer = z.object({
   name: z.string().min(1).max(32),
   team: z.enum(SIDE),
-  kills: z.number().int().nonnegative(),
-  deaths: z.number().int().nonnegative(),
-  assists: z.number().int().nonnegative(),
-  adr: z.number().int().nonnegative(),
+  kills: z.number().int().nonnegative().max(200),
+  deaths: z.number().int().nonnegative().max(200),
+  assists: z.number().int().nonnegative().max(200),
+  adr: z.number().int().nonnegative().max(1000),
   kast: z.number().int().min(0).max(100),
-  rating: z.number().nonnegative(),
+  rating: z.number().nonnegative().max(20),
   isMvp: z.boolean(),
   derived: zDerived,
 })
@@ -90,9 +98,9 @@ export const zMatch = z.object({
   endedAt: z.number().int().positive(),
   winner: z.enum(WINNER),
   mvp: z.string().nullable(),
-  ctScore: z.number().int().nonnegative(),
-  tScore: z.number().int().nonnegative(),
-  roundsObserved: z.number().int().nonnegative(),
+  ctScore: z.number().int().nonnegative().max(60),
+  tScore: z.number().int().nonnegative().max(60),
+  roundsObserved: z.number().int().nonnegative().max(60),
   /** true when observed kill-feed entries == sum of kills in the server table. */
   complete: z.boolean(),
   players: z.array(zPlayer).min(1).max(20),

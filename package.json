@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit",
     "import-log": "tsx scripts/import-log.ts",
     "merge-duplicates": "tsx scripts/merge-duplicates.ts",
+    "purge-junk": "tsx scripts/purge-junk.ts",
     "parse-check": "tsx scripts/parse-check.ts"
   },
   "dependencies": {
