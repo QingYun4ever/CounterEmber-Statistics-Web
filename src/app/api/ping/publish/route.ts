@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateDevice } from '@/lib/api-auth'
-import { getPingRelay, PING_MAX_PER_CHANNEL, PING_MAX_PER_PLAYER } from '@/lib/ping-relay'
+import {
+  derivePingOwner,
+  getPingRelay,
+  PING_MAX_PER_CHANNEL,
+  PING_MAX_PER_PLAYER,
+} from '@/lib/ping-relay'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,12 +25,16 @@ const publishSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  if (!authenticateDevice(request)) {
+  const device = authenticateDevice(request)
+  if (!device) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   try {
     const input = publishSchema.parse(await request.json())
+    if (input.owner !== derivePingOwner(device.player)) {
+      return NextResponse.json({ error: 'player_mismatch' }, { status: 403 })
+    }
     if (Math.abs(input.x) > 30_000_000 || Math.abs(input.y) > 30_000_000 || Math.abs(input.z) > 30_000_000) {
       return NextResponse.json({ error: 'invalid_coordinates' }, { status: 400 })
     }

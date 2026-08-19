@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateDevice } from '@/lib/api-auth'
-import { derivePingChannel, getPingRelay } from '@/lib/ping-relay'
+import { derivePingChannel, derivePingOwner, getPingRelay } from '@/lib/ping-relay'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,14 +15,19 @@ const joinSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  if (!authenticateDevice(request)) {
+  const device = authenticateDevice(request)
+  if (!device) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   try {
     const input = joinSchema.parse(await request.json())
+    const owner = derivePingOwner(device.player)
+    if (input.player !== owner) {
+      return NextResponse.json({ error: 'player_mismatch' }, { status: 403 })
+    }
     const channel = derivePingChannel(input.mode, input.matchKey, input.teamKey)
-    const joined = getPingRelay().join(channel, input.player, Date.now())
+    const joined = getPingRelay().join(channel, owner, Date.now())
     return NextResponse.json({ ok: true, token: joined.token, ...joined.state }, {
       headers: { 'cache-control': 'no-store' },
     })

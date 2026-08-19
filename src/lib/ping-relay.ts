@@ -248,6 +248,14 @@ export function getPingRelay(): PingRelay {
   return globalForRelay.__cestatsPingRelay
 }
 
+/** Stable opaque owner id shared by the mod and relay; raw player names never enter ping state. */
+export function derivePingOwner(player: string): string {
+  return createHash('sha256')
+    .update(`owner|${player.trim().toLowerCase()}`, 'utf8')
+    .digest('hex')
+    .slice(0, 32)
+}
+
 /** Opaque, deterministic channel id. It contains no player names or raw room code. */
 export function derivePingChannel(mode: 'auto' | 'code', matchKey: string, teamKey: string): string {
   return createHash('sha256')

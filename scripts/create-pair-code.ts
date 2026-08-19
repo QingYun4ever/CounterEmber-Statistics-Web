@@ -1,3 +1,5 @@
+export {}
+
 const arg = (name: string, fallback?: string): string | undefined => {
   const index = process.argv.indexOf(`--${name}`)
   return index >= 0 ? process.argv[index + 1] : fallback
