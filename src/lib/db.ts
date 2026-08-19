@@ -96,6 +96,17 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   revoked_at   INTEGER
 );
 
+-- Browser sessions for the operator console at /admin. key_fp binds a session to the admin key it
+-- was created with, so rotating CESTATS_ADMIN_KEY logs every console out.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id           TEXT PRIMARY KEY,
+  token_hash   TEXT NOT NULL UNIQUE,
+  key_fp       TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  expires_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_matches_ended    ON matches(ended_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mp_player        ON match_players(player);
 CREATE INDEX IF NOT EXISTS idx_kill_match_round ON kill_events(match_id, round_idx, seq);
@@ -117,10 +128,30 @@ export type DeviceTokenSummary = DeviceTokenAuth & {
   revokedAt: number | null
 }
 
+/**
+ * What the operator console can show about a pairing code.
+ *
+ * `id` is the stored hash: only the hash exists server-side, so the code itself can never be shown
+ * again after the response that created it.
+ */
+export type PairingCodeSummary = {
+  id: string
+  player: string
+  createdAt: number
+  expiresAt: number
+  usedAt: number | null
+  attempts: number
+}
+
 const PAIRING_CODE_TTL_MS = 15 * 60 * 1000
 const PAIRING_MAX_ATTEMPTS = 5
+/** Used codes stay listed this long so the console can show what happened, then get swept. */
+const PAIRING_CODE_KEEP_MS = 24 * 60 * 60 * 1000
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000
 const DEVICE_TOKEN_PREFIX = 'cestats-device-v1|'
 const PAIRING_CODE_PREFIX = 'cestats-pair-v1|'
+const ADMIN_SESSION_PREFIX = 'cestats-admin-session-v1|'
+const ADMIN_KEY_FP_PREFIX = 'cestats-admin-key-fp-v1|'
 
 const globalForDb = globalThis as unknown as { __cestatsDb?: Db }
 
@@ -209,6 +240,44 @@ export function issuePairingCode(player: string, now = Date.now()): {
      VALUES (?, ?, ?, ?, 0, NULL)`,
   ).run(hashPairingCode(code), player, now, expiresAt)
   return { code, player, expiresAt }
+}
+
+/** Recent codes for the operator console. Sweeps rows nobody can act on anymore first. */
+export function listPairingCodes(now = Date.now(), limit = 25): PairingCodeSummary[] {
+  const db = getDb()
+  db.prepare('DELETE FROM pairing_codes WHERE created_at <= ?').run(now - PAIRING_CODE_KEEP_MS)
+  return db
+    .prepare(
+      `SELECT code_hash, player, created_at, expires_at, used_at, attempts
+       FROM pairing_codes ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(limit)
+    .map((row) => {
+      const value = row as {
+        code_hash: string
+        player: string
+        created_at: number
+        expires_at: number
+        used_at: number | null
+        attempts: number
+      }
+      return {
+        id: value.code_hash,
+        player: value.player,
+        createdAt: value.created_at,
+        expiresAt: value.expires_at,
+        usedAt: value.used_at,
+        attempts: value.attempts,
+      }
+    })
+}
+
+/** Drops a code that was never redeemed — e.g. it went to the wrong player. */
+export function cancelPairingCode(id: string): boolean {
+  const result = getDb()
+    .prepare('DELETE FROM pairing_codes WHERE code_hash = ? AND used_at IS NULL')
+    .run(id)
+  return result.changes > 0
 }
 
 export type RedeemPairingResult = {
@@ -326,6 +395,61 @@ export function revokeDeviceToken(id: string, now = Date.now()): boolean {
     .prepare('UPDATE device_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL')
     .run(now, id)
   return result.changes > 0
+}
+
+/** Ties a console session to one admin key, so rotating the key invalidates existing sessions. */
+export function adminKeyFingerprint(key: string): string {
+  return digestSecret(ADMIN_KEY_FP_PREFIX, key)
+}
+
+function hashAdminSession(token: string): string {
+  return digestSecret(ADMIN_SESSION_PREFIX, token)
+}
+
+/** Creates a browser session for /admin and returns the raw cookie value exactly once. */
+export function createAdminSession(
+  keyFingerprint: string,
+  now = Date.now(),
+): { token: string; expiresAt: number } {
+  const db = getDb()
+  const token = randomBytes(32).toString('base64url')
+  const expiresAt = now + ADMIN_SESSION_TTL_MS
+  db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ? OR key_fp <> ?').run(
+    now,
+    keyFingerprint,
+  )
+  db.prepare(
+    `INSERT INTO admin_sessions (id, token_hash, key_fp, created_at, expires_at, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), hashAdminSession(token), keyFingerprint, now, expiresAt, now)
+  return { token, expiresAt }
+}
+
+/** Validates a console session cookie, sliding its expiry forward while it stays in use. */
+export function authenticateAdminSession(
+  token: string,
+  keyFingerprint: string,
+  now = Date.now(),
+): boolean {
+  const db = getDb()
+  const hash = hashAdminSession(token)
+  const row = db
+    .prepare('SELECT key_fp, expires_at, last_seen_at FROM admin_sessions WHERE token_hash = ?')
+    .get(hash) as { key_fp: string; expires_at: number; last_seen_at: number } | undefined
+
+  if (!row || row.expires_at <= now || row.key_fp !== keyFingerprint) return false
+  if (now - row.last_seen_at >= 60_000) {
+    db.prepare('UPDATE admin_sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?').run(
+      now,
+      now + ADMIN_SESSION_TTL_MS,
+      hash,
+    )
+  }
+  return true
+}
+
+export function deleteAdminSession(token: string): void {
+  getDb().prepare('DELETE FROM admin_sessions WHERE token_hash = ?').run(hashAdminSession(token))
 }
 
 export type IngestResult = {
