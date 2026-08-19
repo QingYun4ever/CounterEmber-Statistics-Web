@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminError, adminFetch, countdown } from '@/lib/admin-client'
 import { copyText } from '@/lib/clipboard'
-import type { DeviceTokenSummary, PairingCodeSummary } from '@/lib/db'
+import type { DeviceTokenSummary, PairRequestSummary, PairingCodeSummary } from '@/lib/db'
 import { fmtDate, relative } from '@/lib/format'
 import { Card, Pill, SectionTitle } from './ui'
 
@@ -73,11 +73,13 @@ function CopyButton({
  */
 export default function AdminConsole({
   players,
+  initialRequests,
   initialCodes,
   initialDevices,
   ingestEnabled,
 }: {
   players: string[]
+  initialRequests: PairRequestSummary[]
   initialCodes: PairingCodeSummary[]
   initialDevices: DeviceTokenSummary[]
   ingestEnabled: boolean
@@ -86,6 +88,7 @@ export default function AdminConsole({
   const now = useClock()
 
   const [player, setPlayer] = useState('')
+  const [requests, setRequests] = useState(initialRequests)
   const [codes, setCodes] = useState(initialCodes)
   const [devices, setDevices] = useState(initialDevices)
   const [issued, setIssued] = useState<IssuedCode | null>(null)
@@ -103,16 +106,33 @@ export default function AdminConsole({
 
   const reload = useCallback(async () => {
     try {
-      const [codeList, deviceList] = await Promise.all([
+      const [requestList, codeList, deviceList] = await Promise.all([
+        adminFetch<{ requests: PairRequestSummary[] }>('/api/admin/pair-requests'),
         adminFetch<{ codes: PairingCodeSummary[] }>('/api/admin/pairing'),
         adminFetch<{ devices: DeviceTokenSummary[] }>('/api/admin/devices'),
       ])
+      setRequests(requestList.requests)
       setCodes(codeList.codes)
       setDevices(deviceList.devices)
     } catch (e) {
       handle(e)
     }
   }, [handle])
+
+  /**
+   * Pending in-game requests are the one thing here that appears without the operator doing
+   * anything, so the list polls. Everything else only changes in response to a click.
+   */
+  useEffect(() => {
+    const timer = setInterval(() => {
+      adminFetch<{ requests: PairRequestSummary[] }>('/api/admin/pair-requests')
+        .then((result) => setRequests(result.requests))
+        .catch(() => {
+          // A failed background poll should not put an error banner in front of the operator.
+        })
+    }, 10_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const suggestions = useMemo(() => {
     const paired = new Set(devices.filter((d) => d.revokedAt === null).map((d) => d.player))
@@ -132,6 +152,45 @@ export default function AdminConsole({
       })
       setIssued(result)
       setPlayer('')
+      await reload()
+    } catch (e) {
+      handle(e)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * Approves a request the player opened in game.
+   *
+   * Approving hands out nothing: the client still has to come back with the claim secret only it
+   * holds. So the question the operator is answering is "is this really that player", not "should
+   * this browser get a token".
+   */
+  async function approveRequest(pending: PairRequestSummary) {
+    setBusy(pending.id)
+    setError(null)
+    try {
+      await adminFetch('/api/admin/pair-requests', {
+        method: 'POST',
+        body: JSON.stringify({ id: pending.id, approvedBy: 'console' }),
+      })
+      await reload()
+    } catch (e) {
+      handle(e)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function rejectRequest(pending: PairRequestSummary) {
+    setBusy(pending.id)
+    setError(null)
+    try {
+      await adminFetch('/api/admin/pair-requests', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: pending.id }),
+      })
       await reload()
     } catch (e) {
       handle(e)
@@ -188,6 +247,7 @@ export default function AdminConsole({
   }
 
   const pending = codes.filter((c) => c.usedAt === null && (now === null || c.expiresAt > now))
+  const waiting = requests.filter((r) => r.approvedAt === null)
   const activeDevices = devices.filter((d) => d.revokedAt === null)
 
   return (
@@ -196,7 +256,8 @@ export default function AdminConsole({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">站长控制台</h1>
           <p className="mt-1 text-sm text-ink-400">
-            {activeDevices.length} 台设备已配对 · {pending.length} 个配对码待使用
+            {activeDevices.length} 台设备已配对 · {waiting.length} 个绑定请求待批准 ·{' '}
+            {pending.length} 个配对码待使用
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,8 +279,104 @@ export default function AdminConsole({
 
       <section>
         <SectionTitle
+          title="绑定请求"
+          hint="玩家在游戏里执行 /cestats bind 后出现在这里；批准后由他的客户端自己取走令牌，令牌不会经过任何聊天窗口"
+          right={
+            <span className="text-xs text-ink-400">每 10 秒自动刷新</span>
+          }
+        />
+        {requests.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-ink-400">
+            暂无绑定请求。玩家在游戏里执行{' '}
+            <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats bind</code>{' '}
+            就会出现在这里，也可以直接在 QQ 群里报绑定码。
+          </Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-white/60 text-left text-[11px] uppercase tracking-[0.09em] text-ink-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">玩家</th>
+                  <th className="px-5 py-3 font-medium">来源服务器</th>
+                  <th className="px-5 py-3 font-medium">安装</th>
+                  <th className="px-5 py-3 font-medium">状态</th>
+                  <th className="px-5 py-3 text-right font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((pendingRequest) => {
+                  const left = now === null ? null : countdown(pendingRequest.expiresAt, now)
+                  return (
+                    <tr
+                      key={pendingRequest.id}
+                      className="border-b border-white/40 last:border-0"
+                    >
+                      <td className="px-5 py-3 font-medium text-ink-900">
+                        {pendingRequest.player}
+                      </td>
+                      <td className="px-5 py-3 text-xs text-ink-400">
+                        {pendingRequest.server ?? '—'}
+                      </td>
+                      <td
+                        className="num px-5 py-3 text-xs text-ink-400"
+                        title={pendingRequest.installId}
+                      >
+                        {pendingRequest.installId.slice(0, 8)}
+                      </td>
+                      <td className="px-5 py-3">
+                        {pendingRequest.claimedAt !== null ? (
+                          <Pill tone="good">已完成</Pill>
+                        ) : pendingRequest.approvedAt !== null ? (
+                          <span className="flex items-center gap-2">
+                            <Pill tone="good">已批准</Pill>
+                            <span className="text-xs text-ink-400">
+                              等客户端取走（{pendingRequest.approvedBy ?? '—'}）
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Pill tone="gold">待批准</Pill>
+                            <span className="num text-xs text-ink-400">{left ?? '—'}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {pendingRequest.approvedAt === null ? (
+                          <span className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => approveRequest(pendingRequest)}
+                              disabled={busy === pendingRequest.id}
+                              className="rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-ink-700 disabled:opacity-40"
+                            >
+                              批准
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => rejectRequest(pendingRequest)}
+                              disabled={busy === pendingRequest.id}
+                              className="rounded-lg border border-rose-100 bg-rose-50/70 px-3 py-1.5 text-xs font-medium text-bad transition-colors hover:bg-rose-100/70 disabled:opacity-40"
+                            >
+                              拒绝
+                            </button>
+                          </span>
+                        ) : (
+                          <At ms={pendingRequest.approvedAt} now={now} />
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </section>
+
+      <section>
+        <SectionTitle
           title="发放配对码"
-          hint="配对码 15 分钟内有效、只能用一次，且只有填在这里的玩家能用它配对"
+          hint="给进不了游戏或不用 QQ 群的玩家用的旁路：配对码 15 分钟内有效、只能用一次，且只有填在这里的玩家能用它配对"
         />
         <Card className="p-6">
           <form onSubmit={issue} className="flex flex-wrap items-end gap-3">

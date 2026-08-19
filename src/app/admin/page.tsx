@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import AdminConsole from '@/components/AdminConsole'
 import AdminLogin from '@/components/AdminLogin'
 import { ADMIN_SESSION_COOKIE, adminKeyConfigured, adminSessionValid } from '@/lib/api-auth'
-import { listDeviceTokens, listPairingCodes } from '@/lib/db'
+import { listDeviceTokens, listPairRequests, listPairingCodes } from '@/lib/db'
 import { allPlayerNames } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +26,7 @@ export default async function AdminPage() {
   return (
     <AdminConsole
       players={allPlayerNames()}
+      initialRequests={listPairRequests()}
       initialCodes={listPairingCodes()}
       initialDevices={listDeviceTokens()}
       ingestEnabled={process.env.CESTATS_INGEST_ENABLED !== 'false'}

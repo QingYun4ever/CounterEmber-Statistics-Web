@@ -124,3 +124,32 @@ export function noteLoginFailure(request: Request, now = Date.now()): void {
 export function clearLoginFailures(request: Request): void {
   loginFailures.delete(clientKey(request))
 }
+
+const PUBLIC_WRITE_WINDOW_MS = 10 * 60 * 1000
+const PUBLIC_WRITE_MAX = 12
+const publicWrites = new Map<string, { count: number; first: number }>()
+
+/**
+ * Rate limit for /api/pair/request, the one write that needs no credentials.
+ *
+ * Counts *successes* rather than failures, unlike the login throttle: every accepted request
+ * creates a row, so the thing worth bounding is how many a single source can open. In-memory and
+ * per-process, which is fine for a single-container deployment and degrades to "no limit across
+ * replicas" rather than to a wrong answer.
+ */
+export function publicWriteBlocked(request: Request, now = Date.now()): boolean {
+  const entry = publicWrites.get(clientKey(request))
+  if (!entry) return false
+  if (now - entry.first > PUBLIC_WRITE_WINDOW_MS) return false
+  return entry.count >= PUBLIC_WRITE_MAX
+}
+
+export function notePublicWrite(request: Request, now = Date.now()): void {
+  const key = clientKey(request)
+  const entry = publicWrites.get(key)
+  if (!entry || now - entry.first > PUBLIC_WRITE_WINDOW_MS) {
+    publicWrites.set(key, { count: 1, first: now })
+    return
+  }
+  entry.count += 1
+}

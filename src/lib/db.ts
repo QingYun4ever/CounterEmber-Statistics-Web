@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
@@ -86,6 +86,22 @@ CREATE TABLE IF NOT EXISTS pairing_codes (
   used_at   INTEGER
 );
 
+-- Pairing started from inside the game: the client posts a request, shows the short code, and a
+-- human approves that code out-of-band (QQ group or /admin). Only claim_hash is a credential --
+-- the code is a public claim ticket, so leaking it cannot hand anyone a device token.
+CREATE TABLE IF NOT EXISTS pair_requests (
+  code_hash   TEXT PRIMARY KEY,
+  claim_hash  TEXT NOT NULL UNIQUE,
+  player      TEXT NOT NULL,
+  install_id  TEXT NOT NULL,
+  server      TEXT,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  approved_at INTEGER,
+  approved_by TEXT,
+  claimed_at  INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS device_tokens (
   id           TEXT PRIMARY KEY,
   token_hash   TEXT NOT NULL UNIQUE,
@@ -107,6 +123,7 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   last_seen_at INTEGER NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_pair_req_install ON pair_requests(install_id);
 CREATE INDEX IF NOT EXISTS idx_matches_ended    ON matches(ended_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mp_player        ON match_players(player);
 CREATE INDEX IF NOT EXISTS idx_kill_match_round ON kill_events(match_id, round_idx, seq);
@@ -147,9 +164,21 @@ const PAIRING_CODE_TTL_MS = 15 * 60 * 1000
 const PAIRING_MAX_ATTEMPTS = 5
 /** Used codes stay listed this long so the console can show what happened, then get swept. */
 const PAIRING_CODE_KEEP_MS = 24 * 60 * 60 * 1000
+/**
+ * Longer than a pairing code's TTL: this window has to cover a human noticing a message in a QQ
+ * group and answering it, not just an operator pasting a code they already generated.
+ */
+const PAIR_REQUEST_TTL_MS = 20 * 60 * 1000
+/**
+ * Ceiling on unapproved in-game requests. /api/pair/request is the only unauthenticated write in
+ * the app, so it needs a bound that does not depend on the per-IP throttle in front of it.
+ */
+const PAIR_REQUEST_MAX_PENDING = 200
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000
 const DEVICE_TOKEN_PREFIX = 'cestats-device-v1|'
 const PAIRING_CODE_PREFIX = 'cestats-pair-v1|'
+const PAIR_REQUEST_CODE_PREFIX = 'cestats-bind-code-v1|'
+const PAIR_REQUEST_CLAIM_PREFIX = 'cestats-bind-claim-v1|'
 const ADMIN_SESSION_PREFIX = 'cestats-admin-session-v1|'
 const ADMIN_KEY_FP_PREFIX = 'cestats-admin-key-fp-v1|'
 
@@ -288,6 +317,32 @@ export type RedeemPairingResult = {
   player: string
 }
 
+/**
+ * Issues a fresh device token for one installation, revoking whatever that installation had.
+ *
+ * Re-pairing is deliberately non-destructive to the player's *other* machines: the revoke is
+ * scoped to `installId`, so a laptop pairing again does not log the desktop out. Callers must
+ * already be inside a transaction — the revoke and the insert have to land together.
+ */
+function mintDeviceToken(
+  db: Db,
+  player: string,
+  installId: string,
+  now: number,
+): RedeemPairingResult {
+  const tokenId = randomUUID()
+  const token = randomBytes(32).toString('base64url')
+  db.prepare(
+    'UPDATE device_tokens SET revoked_at = ? WHERE install_id = ? AND revoked_at IS NULL',
+  ).run(now, installId)
+  db.prepare(
+    `INSERT INTO device_tokens
+       (id, token_hash, player, install_id, created_at, last_seen_at, revoked_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+  ).run(tokenId, hashDeviceToken(token), player, installId, now, now)
+  return { tokenId, token, player }
+}
+
 /** Redeems a one-time code and returns the raw token exactly once. */
 export function redeemPairingCode(
   code: string,
@@ -317,23 +372,257 @@ export function redeemPairingCode(
       return null
     }
 
-    const tokenId = randomUUID()
-    const token = randomBytes(32).toString('base64url')
     db.prepare('UPDATE pairing_codes SET used_at = ? WHERE code_hash = ?').run(now, row.code_hash)
-    // Re-pairing this installation invalidates its previous token without affecting other devices.
-    db.prepare(
-      'UPDATE device_tokens SET revoked_at = ? WHERE install_id = ? AND revoked_at IS NULL',
-    ).run(now, installId)
-    db.prepare(
-      `INSERT INTO device_tokens
-         (id, token_hash, player, install_id, created_at, last_seen_at, revoked_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-    ).run(tokenId, hashDeviceToken(token), player, installId, now, now)
-
-    return { tokenId, token, player }
+    return mintDeviceToken(db, player, installId, now)
   })
 
   return redeem()
+}
+
+/** Crockford base32 minus the ambiguous letters, so a code can be read off a chat line and typed. */
+const BIND_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+const BIND_CODE_LENGTH = 6
+
+/** Uppercases, drops separators, and folds the look-alikes Crockford defines away. */
+export function normalizeBindCode(raw: string): string {
+  return String(raw ?? '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .replace(/O/g, '0')
+    .replace(/[IL]/g, '1')
+}
+
+function hashBindCode(code: string): string {
+  return digestSecret(PAIR_REQUEST_CODE_PREFIX, normalizeBindCode(code))
+}
+
+function hashClaimSecret(secret: string): string {
+  return digestSecret(PAIR_REQUEST_CLAIM_PREFIX, secret)
+}
+
+/**
+ * What an approver is allowed to learn about a pending request.
+ *
+ * `id` is the code hash: the console approves by id without ever seeing the code, and the QQ bot
+ * approves by code. Neither ever receives the claim secret.
+ */
+export type PairRequestSummary = {
+  id: string
+  player: string
+  installId: string
+  server: string | null
+  createdAt: number
+  expiresAt: number
+  approvedAt: number | null
+  approvedBy: string | null
+  claimedAt: number | null
+}
+
+type PairRequestRow = {
+  code_hash: string
+  player: string
+  install_id: string
+  server: string | null
+  created_at: number
+  expires_at: number
+  approved_at: number | null
+  approved_by: string | null
+  claimed_at: number | null
+}
+
+function toPairRequest(row: PairRequestRow): PairRequestSummary {
+  return {
+    id: row.code_hash,
+    player: row.player,
+    installId: row.install_id,
+    server: row.server,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    approvedAt: row.approved_at,
+    approvedBy: row.approved_by,
+    claimedAt: row.claimed_at,
+  }
+}
+
+const PAIR_REQUEST_COLUMNS = `code_hash, player, install_id, server, created_at, expires_at,
+                              approved_at, approved_by, claimed_at`
+
+export type CreatedPairRequest = {
+  code: string
+  claimSecret: string
+  player: string
+  expiresAt: number
+}
+
+/**
+ * Opens a pairing request from inside the game.
+ *
+ * Returns two very different strings: `code` is meant to be read aloud into a QQ group, while
+ * `claimSecret` never leaves the client and is the only thing that can collect the device token.
+ * That split is the whole point of this flow — approving a code cannot hand a token to whoever
+ * happened to see it.
+ *
+ * @returns null when too many requests are already waiting for an answer
+ */
+export function createPairRequest(
+  player: string,
+  installId: string,
+  server: string | null,
+  now = Date.now(),
+): CreatedPairRequest | null {
+  const db = getDb()
+
+  const create = db.transaction((): CreatedPairRequest | null => {
+    db.prepare('DELETE FROM pair_requests WHERE expires_at <= ?').run(now)
+    // One open request per installation: asking again supersedes the code the player misread.
+    db.prepare('DELETE FROM pair_requests WHERE install_id = ? AND claimed_at IS NULL').run(installId)
+
+    const pending = db
+      .prepare('SELECT COUNT(*) AS n FROM pair_requests WHERE approved_at IS NULL')
+      .get() as { n: number }
+    if (pending.n >= PAIR_REQUEST_MAX_PENDING) return null
+
+    // Retry rather than tolerate a collision: the code is a primary key, and at 32^6 the loop
+    // effectively never runs twice.
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      let code = ''
+      for (let i = 0; i < BIND_CODE_LENGTH; i += 1) {
+        code += BIND_CODE_ALPHABET[randomInt(BIND_CODE_ALPHABET.length)]
+      }
+      const codeHash = hashBindCode(code)
+      const exists = db
+        .prepare('SELECT 1 FROM pair_requests WHERE code_hash = ?')
+        .get(codeHash) as unknown
+      if (exists) continue
+
+      const claimSecret = randomBytes(32).toString('base64url')
+      const expiresAt = now + PAIR_REQUEST_TTL_MS
+      db.prepare(
+        `INSERT INTO pair_requests
+           (code_hash, claim_hash, player, install_id, server, created_at, expires_at,
+            approved_at, approved_by, claimed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)`,
+      ).run(codeHash, hashClaimSecret(claimSecret), player, installId, server, now, expiresAt)
+      return { code, claimSecret, player, expiresAt }
+    }
+    return null
+  })
+
+  return create()
+}
+
+/** Reads a request by its code so an approver can check who it belongs to before approving. */
+export function lookupPairRequest(code: string, now = Date.now()): PairRequestSummary | null {
+  const row = getDb()
+    .prepare(`SELECT ${PAIR_REQUEST_COLUMNS} FROM pair_requests WHERE code_hash = ?`)
+    .get(hashBindCode(code)) as PairRequestRow | undefined
+  if (!row || row.expires_at <= now) return null
+  return toPairRequest(row)
+}
+
+export type ApprovePairRequestResult =
+  | { status: 'approved'; request: PairRequestSummary }
+  | { status: 'already_approved'; request: PairRequestSummary }
+  | { status: 'unknown' }
+
+/**
+ * Marks a request approved. Idempotent: a second approval reports the first one's outcome.
+ *
+ * Approving does not create the device token — the client still has to come back with its claim
+ * secret. So an approver who is not the player gains nothing but a completed pairing for someone
+ * else's machine.
+ */
+export function approvePairRequest(
+  selector: { code: string } | { id: string },
+  approvedBy: string,
+  now = Date.now(),
+): ApprovePairRequestResult {
+  const db = getDb()
+  const codeHash = 'code' in selector ? hashBindCode(selector.code) : selector.id
+
+  const approve = db.transaction((): ApprovePairRequestResult => {
+    const row = db
+      .prepare(`SELECT ${PAIR_REQUEST_COLUMNS} FROM pair_requests WHERE code_hash = ?`)
+      .get(codeHash) as PairRequestRow | undefined
+    if (!row || row.expires_at <= now) return { status: 'unknown' }
+    if (row.approved_at !== null) {
+      return { status: 'already_approved', request: toPairRequest(row) }
+    }
+    db.prepare(
+      'UPDATE pair_requests SET approved_at = ?, approved_by = ? WHERE code_hash = ?',
+    ).run(now, approvedBy, codeHash)
+    return {
+      status: 'approved',
+      request: { ...toPairRequest(row), approvedAt: now, approvedBy },
+    }
+  })
+
+  return approve()
+}
+
+/** Drops a request outright — the operator's "no" to something in the pending list. */
+export function rejectPairRequest(id: string): boolean {
+  return getDb().prepare('DELETE FROM pair_requests WHERE code_hash = ?').run(id).changes > 0
+}
+
+/** Live requests for the console, newest first. Expired rows are swept on the way through. */
+export function listPairRequests(now = Date.now(), limit = 25): PairRequestSummary[] {
+  const db = getDb()
+  db.prepare('DELETE FROM pair_requests WHERE expires_at <= ?').run(now)
+  return (
+    db
+      .prepare(
+        `SELECT ${PAIR_REQUEST_COLUMNS} FROM pair_requests
+         ORDER BY approved_at IS NOT NULL, created_at DESC LIMIT ?`,
+      )
+      .all(limit) as PairRequestRow[]
+  ).map(toPairRequest)
+}
+
+export type ClaimPairResult =
+  | { status: 'pending'; player: string; expiresAt: number }
+  | { status: 'paired'; player: string; deviceId: string; deviceToken: string }
+  | { status: 'unknown' }
+
+/**
+ * The client's side of the flow: poll with the claim secret until a human has approved.
+ *
+ * Re-claiming an already-claimed request mints a *fresh* token rather than failing, because the
+ * response carrying the previous one may simply have been lost. Only the claim-secret holder can
+ * get here, and re-minting is scoped to this installation, so replay costs nothing.
+ */
+export function claimPairRequest(
+  claimSecret: string,
+  installId: string,
+  now = Date.now(),
+): ClaimPairResult {
+  const db = getDb()
+
+  const claim = db.transaction((): ClaimPairResult => {
+    const row = db
+      .prepare(`SELECT ${PAIR_REQUEST_COLUMNS} FROM pair_requests WHERE claim_hash = ?`)
+      .get(hashClaimSecret(claimSecret)) as PairRequestRow | undefined
+
+    // A moved installId means this is not the client that opened the request.
+    if (!row || row.expires_at <= now || row.install_id !== installId) return { status: 'unknown' }
+    if (row.approved_at === null) {
+      return { status: 'pending', player: row.player, expiresAt: row.expires_at }
+    }
+
+    const minted = mintDeviceToken(db, row.player, row.install_id, now)
+    db.prepare('UPDATE pair_requests SET claimed_at = ? WHERE code_hash = ?').run(
+      now,
+      row.code_hash,
+    )
+    return {
+      status: 'paired',
+      player: minted.player,
+      deviceId: minted.tokenId,
+      deviceToken: minted.token,
+    }
+  })
+
+  return claim()
 }
 
 /** Looks up a token by hash and updates activity without writing on every poll request. */
