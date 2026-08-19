@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { expectedApiKey, apiKeyMatches } from '@/lib/api-auth'
+import { authenticateDevice } from '@/lib/api-auth'
 import { getPingRelay, PING_LONG_POLL_MS } from '@/lib/ping-relay'
 
 export const runtime = 'nodejs'
@@ -14,13 +14,8 @@ const querySchema = z.object({
   wait: z.coerce.number().int().min(0).max(PING_LONG_POLL_MS).default(PING_LONG_POLL_MS),
 })
 
-function authorized(request: Request): boolean {
-  const expected = expectedApiKey()
-  return expected !== null && apiKeyMatches(request.headers.get('x-api-key'), expected)
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!authenticateDevice(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

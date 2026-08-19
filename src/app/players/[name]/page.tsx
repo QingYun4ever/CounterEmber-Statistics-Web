@@ -302,26 +302,32 @@ export default async function PlayerPage({ params }: { params: Promise<{ name: s
               <p className="text-sm text-ink-400">暂无数据。</p>
             ) : (
               <div className="grid gap-1.5">
-                {rows.slice(0, 8).map((r) => (
-                  <div key={r.other} className="flex items-center gap-3 text-sm">
-                    <PlayerLink name={r.other} className="w-32 shrink-0 truncate text-ink-700" />
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/70">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${ratio(r.wins, r.matches)}%`,
-                          background:
-                            r.wins * 2 >= r.matches
-                              ? 'linear-gradient(90deg,#5ec99a,#2fa36b)'
-                              : 'linear-gradient(90deg,#f19aa6,#e5566a)',
-                        }}
-                      />
+                {rows.slice(0, 8).map((r) => {
+                  const rate = ratio(r.wins, r.matches)
+                  return (
+                    <div key={r.other} className="flex items-center gap-3 text-sm">
+                      <PlayerLink name={r.other} className="w-32 shrink-0 truncate text-ink-700" />
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/70">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${rate}%`,
+                            background:
+                              r.wins * 2 >= r.matches
+                                ? 'linear-gradient(90deg,#5ec99a,#2fa36b)'
+                                : 'linear-gradient(90deg,#f19aa6,#e5566a)',
+                          }}
+                        />
+                      </div>
+                      <span
+                        className="num w-16 shrink-0 text-right text-xs text-ink-500"
+                        title={`${r.matches} 场 · ${r.wins} 胜 ${r.matches - r.wins} 负`}
+                      >
+                        {pct1(rate)}
+                      </span>
                     </div>
-                    <span className="num w-14 text-right text-xs text-ink-500">
-                      {r.wins}/{r.matches}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </Card>

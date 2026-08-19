@@ -8,9 +8,10 @@ services:
       # Loopback by default; set CESTATS_BIND=0.0.0.0 to expose it directly.
       - "${CESTATS_BIND:-127.0.0.1}:${CESTATS_PORT:-3100}:3100"
     environment:
-      # Change this before putting the site on a public address — it is the only thing
-      # standing between the internet and your database.
-      CESTATS_API_KEY: ${CESTATS_API_KEY:-cestats-change-me}
+      # The public mod no longer receives a shared write key. The admin key is only used by the
+      # operator to create/revoke one-time pairing codes and device tokens.
+      CESTATS_ADMIN_KEY: ${CESTATS_ADMIN_KEY:-}
+      CESTATS_INGEST_ENABLED: ${CESTATS_INGEST_ENABLED:-true}
       CESTATS_SITE_URL: ${CESTATS_SITE_URL:-http://127.0.0.1:3100}
       CESTATS_DB: /data/cestats.db
       CESTATS_SKIN_CACHE: /data/skins

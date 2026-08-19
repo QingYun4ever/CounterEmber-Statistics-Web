@@ -6,22 +6,23 @@ import { Head } from './Avatar'
 import { PlayerLink, Rating } from './ui'
 
 /**
- * The MVP row is marked with background layers only — a star watermark bleeding out of the
- * top-left corner plus a gold wash fading to the right. Keeping it in the background means the
- * ornament sits *behind* the avatar instead of crowding the name, and the row stays the same
- * height as every other one.
+ * The MVP row is marked with background layers only — a star tucked into the top-left corner
+ * plus a gold wash fading to the right. Keeping it in the background means the ornament sits
+ * *behind* the avatar instead of crowding the name, and the row stays the same height as every
+ * other one. The star is sized to the row height and bleeds off only the left edge, so it reads
+ * as a whole star rather than a sliced one.
  */
 const MVP_STAR = `url("data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
-    '<path fill="#e0a01c" fill-opacity=".62" d="M12 1.8 14.47 8.9 21.99 9.06 15.99 13.6' +
+    '<path fill="#e0a01c" fill-opacity=".52" d="M12 1.8 14.47 8.9 21.99 9.06 15.99 13.6' +
     ' 18.17 20.79 12 16.5 5.83 20.79 8.01 13.6 2.01 9.06 9.53 8.9Z"/></svg>',
 )}")`
 
 const MVP_ROW: CSSProperties = {
   backgroundImage: `${MVP_STAR}, linear-gradient(90deg, rgba(245,181,68,0.30) 0%, rgba(245,181,68,0.11) 38%, rgba(245,181,68,0) 82%)`,
   backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'left -12px top -13px, left top',
-  backgroundSize: '42px 42px, 100% 100%',
+  backgroundPosition: 'left -10px top 1px, left top',
+  backgroundSize: '36px 36px, 100% 100%',
 }
 
 function TeamBlock({

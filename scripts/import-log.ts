@@ -25,7 +25,7 @@ const hasFlag = (name: string) => process.argv.includes(`--${name}`)
 
 const file = arg('file', 'D:/Minecraft/ce/latest.log')!
 const baseUrl = arg('url', 'http://127.0.0.1:3100')!
-const apiKey = arg('key', process.env.CESTATS_API_KEY ?? 'dev-key')!
+const deviceToken = arg('token', process.env.CESTATS_DEVICE_TOKEN)
 const dry = hasFlag('dry')
 const dumpDir = arg('dump')
 
@@ -123,13 +123,19 @@ if (dry) {
   console.log('--dry：未上传。')
   process.exit(0)
 }
+if (!deviceToken) {
+  throw new Error('上传需要 --token 或 CESTATS_DEVICE_TOKEN；先用设备配对流程获取令牌。')
+}
 
 let ok = 0
 for (const m of matches) {
   const { matchId: _ignored, ...payload } = m
   const res = await fetch(`${baseUrl}/api/ingest`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${deviceToken}`,
+    },
     body: JSON.stringify(payload),
   })
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>

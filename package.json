@@ -9,6 +9,7 @@
     "start": "next start -p 3100",
     "lint": "tsc --noEmit",
     "import-log": "tsx scripts/import-log.ts",
+    "create-pair-code": "tsx scripts/create-pair-code.ts",
     "merge-duplicates": "tsx scripts/merge-duplicates.ts",
     "purge-junk": "tsx scripts/purge-junk.ts",
     "parse-check": "tsx scripts/parse-check.ts"
