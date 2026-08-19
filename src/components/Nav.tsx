@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -21,12 +22,14 @@ export default function Nav({ me }: { me: string | null }) {
     <header className="sticky top-0 z-20 border-b border-white/60 bg-white/45 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-8 px-5 py-3.5">
         <Link href="/" className="flex items-center gap-2.5">
-          <span
-            className="grid h-7 w-7 place-items-center rounded-lg text-[11px] font-bold text-white"
-            style={{ backgroundImage: 'linear-gradient(135deg, #7c8cff, #b15cff)' }}
-          >
-            CE
-          </span>
+          <Image
+            src="/icon.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded-lg"
+            priority
+          />
           <span className="text-[15px] font-semibold tracking-tight">CE Stats</span>
         </Link>
 

@@ -1,6 +1,7 @@
 import { SIDE_NAME } from '@/lib/format'
 import type { MatchPlayerRow, MatchRow } from '@/lib/queries'
 import type { Side } from '@/lib/protocol'
+import { Head } from './Avatar'
 import { PlayerLink, Rating } from './ui'
 
 function TeamBlock({
@@ -55,7 +56,8 @@ function TeamBlock({
                   }`}
                 >
                   <td className="py-2 pl-3">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-2">
+                      <Head name={p.player} size={22} />
                       {p.is_mvp ? <span className="text-gold">★</span> : null}
                       <PlayerLink name={p.player} className="font-medium text-ink-900" />
                     </span>

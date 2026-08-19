@@ -22,7 +22,8 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3100 \
     HOSTNAME=0.0.0.0 \
-    CESTATS_DB=/data/cestats.db
+    CESTATS_DB=/data/cestats.db \
+    CESTATS_SKIN_CACHE=/data/skins
 
 RUN useradd -m -u 1001 cestats && mkdir -p /data && chown cestats /data
 

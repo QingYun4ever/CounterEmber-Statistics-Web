@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { fmtDate, relative, SIDE_NAME } from '@/lib/format'
 import type { MatchPlayerRow, MatchRow } from '@/lib/queries'
+import { Head } from './Avatar'
 import { Card, Pill, Rating } from './ui'
 
 const WINNER_SHORT: Record<string, string> = {
@@ -93,12 +94,15 @@ export default function MatchList({
                 ) : (
                   <div className="hidden items-center gap-4 sm:flex">
                     {top.map((p) => (
-                      <div key={p.player} className="text-xs">
-                        <div className="flex items-center gap-1 font-medium text-ink-700">
-                          {p.is_mvp ? <span className="text-gold">★</span> : null}
-                          {p.player}
+                      <div key={p.player} className="flex items-center gap-1.5 text-xs">
+                        <Head name={p.player} size={20} />
+                        <div>
+                          <div className="flex items-center gap-1 font-medium text-ink-700">
+                            {p.is_mvp ? <span className="text-gold">★</span> : null}
+                            {p.player}
+                          </div>
+                          <Rating value={p.rating} className="text-xs" />
                         </div>
-                        <Rating value={p.rating} className="text-xs" />
                       </div>
                     ))}
                   </div>

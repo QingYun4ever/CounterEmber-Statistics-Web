@@ -39,7 +39,7 @@ export function Body({
 }) {
   return (
     <img
-      src={`/api/skin/body/${encodeURIComponent(name)}?s=${Math.round(height * 1.6)}`}
+      src={`/api/skin/body/${encodeURIComponent(name)}?s=${Math.round(height * 2)}`}
       alt={`${name} 的皮肤`}
       loading="lazy"
       draggable={false}

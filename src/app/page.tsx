@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Head } from '@/components/Avatar'
 import MatchList from '@/components/MatchList'
 import { Card, Empty, Kpi, PlayerLink, Rating, SectionTitle } from '@/components/ui'
 import { fmt1, kd, pct } from '@/lib/format'
@@ -51,9 +52,12 @@ export default async function HomePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {top.map((p, i) => (
             <Card key={p.player} i={i} className="p-4">
-              <div className="flex items-center justify-between">
-                <PlayerLink name={p.player} className="text-sm font-medium text-ink-900" />
-                <span className="num text-[11px] text-ink-300">#{i + 1}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Head name={p.player} size={24} />
+                  <PlayerLink name={p.player} className="truncate text-sm font-medium text-ink-900" />
+                </span>
+                <span className="num shrink-0 text-[11px] text-ink-300">#{i + 1}</span>
               </div>
               <div className="mt-2">
                 <Rating value={p.avg_rating} className="text-2xl" />

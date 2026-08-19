@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { Head } from '@/components/Avatar'
+import Podium from '@/components/Podium'
 import { Card, Empty, PlayerLink, Rating, SectionTitle } from '@/components/ui'
 import { fmt1, kd, pct, ratio } from '@/lib/format'
 import { leaderboard, type PlayerAgg } from '@/lib/queries'
@@ -27,6 +29,9 @@ export default async function PlayersPage({
   const min = Math.max(1, Number(sp.min) || 1)
 
   const rows = leaderboard(min).sort((a, b) => SORTS[sort].pick(b) - SORTS[sort].pick(a))
+
+  // The podium is always the Rating top three, whatever the table is sorted by.
+  const podium = [...rows].sort((a, b) => b.avg_rating - a.avg_rating)
 
   const header = (key: SortKey, extra = '') => (
     <th className={`px-3 font-medium ${extra}`}>
@@ -65,7 +70,14 @@ export default async function PlayersPage({
       {rows.length === 0 ? (
         <Empty>没有满足条件的玩家。</Empty>
       ) : (
-        <Card className="overflow-hidden">
+        <>
+          {podium.length >= 3 ? (
+            <section className="pb-2 pt-4">
+              <Podium players={podium} />
+            </section>
+          ) : null}
+
+          <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -94,7 +106,10 @@ export default async function PlayersPage({
                   <tr key={p.player} className="border-t border-white/70 hover:bg-white/40">
                     <td className="num py-2.5 pl-4 text-ink-300">{i + 1}</td>
                     <td className="py-2.5">
-                      <PlayerLink name={p.player} className="font-medium text-ink-900" />
+                      <span className="flex items-center gap-2.5">
+                        <Head name={p.player} size={26} />
+                        <PlayerLink name={p.player} className="font-medium text-ink-900" />
+                      </span>
                     </td>
                     <td className="num px-3 text-right text-ink-500">{p.matches}</td>
                     <td className="num px-3 text-right text-ink-700">
@@ -113,7 +128,8 @@ export default async function PlayersPage({
               </tbody>
             </table>
           </div>
-        </Card>
+          </Card>
+        </>
       )}
 
       <p className="text-xs text-ink-400">

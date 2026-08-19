@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
+import { Body } from '@/components/Avatar'
 import { RatingHistogram, RatingTrend } from '@/components/charts'
 import MatchList from '@/components/MatchList'
+import RatingHero from '@/components/RatingHero'
 import SetMeButton from '@/components/SetMeButton'
-import { Card, DerivedNote, Kpi, PlayerLink, Rating, SectionTitle } from '@/components/ui'
-import { fmt1, fmt2, fmtDay, kd, pct, ratio, ratingStyle } from '@/lib/format'
+import { Card, DerivedNote, Kpi, Pill, PlayerLink, Rating, SectionTitle } from '@/components/ui'
+import { fmt1, fmt2, fmtDay, kd, pct, ratio } from '@/lib/format'
 import { getMe } from '@/lib/me-server'
 import {
   matchesForPlayer,
@@ -76,38 +78,62 @@ export default async function PlayerPage({ params }: { params: Promise<{ name: s
 
   return (
     <div className="grid gap-9">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
-          <p className="mt-1 text-sm text-ink-400">
-            {agg.matches} 场 · {agg.rounds_played} 个观测回合
-            {agg.mvps > 0 ? <span className="ml-2 text-gold">★ {agg.mvps} 次 MVP</span> : null}
-          </p>
-        </div>
-        <SetMeButton name={name} isMe={me === name} />
-      </div>
+      <section className="grid gap-4 lg:grid-cols-[1fr_minmax(19rem,24rem)]">
+        <Card className="relative overflow-hidden p-6">
+          {/* Same lighting trick as the podium: glow behind, contact shadow underneath. */}
+          <div
+            className="pointer-events-none absolute -left-6 bottom-0 h-56 w-56 blur-3xl"
+            style={{ background: 'radial-gradient(circle, rgba(124,140,255,0.30), transparent 70%)' }}
+            aria-hidden
+          />
+          <div className="relative flex items-end gap-6">
+            <div className="relative flex shrink-0 items-end justify-center">
+              <div
+                className="absolute bottom-0 h-2.5 w-20 rounded-full blur-[6px]"
+                style={{ background: 'rgba(31,38,135,0.16)' }}
+                aria-hidden
+              />
+              <Body name={name} height={196} className="relative" />
+            </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Kpi
-          label="AVG RATING"
-          value={fmt2(agg.avg_rating)}
-          accent={ratingStyle(agg.avg_rating)}
-          sub={`最高 ${fmt2(Math.max(...history.map((h) => h.rating)))}`}
-          i={0}
-        />
-        <Kpi label="KAST" value={pct(agg.avg_kast)} i={1} />
-        <Kpi label="ADR" value={fmt1(agg.avg_adr)} i={2} />
+            <div className="min-w-0 flex-1 pb-1">
+              <h1 className="truncate text-3xl font-semibold tracking-tight">{name}</h1>
+              <p className="mt-2 text-sm text-ink-400">
+                {agg.matches} 场 · {agg.rounds_played} 个观测回合
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {agg.mvps > 0 ? <Pill tone="gold">★ {agg.mvps} 次 MVP</Pill> : null}
+                <Pill>
+                  最高 {fmt2(Math.max(...history.map((h) => h.rating)))}
+                </Pill>
+                <Pill tone={agg.wins * 2 >= agg.matches ? 'good' : 'bad'}>
+                  {agg.wins} 胜 {agg.matches - agg.wins} 负
+                </Pill>
+              </div>
+              <div className="mt-4">
+                <SetMeButton name={name} isMe={me === name} />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <RatingHero rating={agg.avg_rating} ratings={history.map((h) => h.rating)} />
+      </section>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Kpi label="KAST" value={pct(agg.avg_kast)} i={0} />
+        <Kpi label="ADR" value={fmt1(agg.avg_adr)} i={1} />
         <Kpi
           label="K / D"
           value={kd(agg.kills, agg.deaths)}
           sub={`${agg.kills} / ${agg.deaths} / ${agg.assists}`}
-          i={3}
+          i={2}
         />
         <Kpi
           label="胜率"
           value={pct(ratio(agg.wins, agg.matches))}
           sub={`${agg.wins} 胜 ${agg.matches - agg.wins} 负`}
-          i={4}
+          i={3}
         />
       </div>
 

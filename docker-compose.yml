@@ -1,23 +1,31 @@
 services:
   cestats:
     build: .
+    image: cestats:latest
+    container_name: cestats
     restart: unless-stopped
     ports:
-      # Bind to loopback only and put Caddy/Nginx in front for TLS.
-      - "127.0.0.1:3100:3100"
+      # Loopback by default; set CESTATS_BIND=0.0.0.0 to expose it directly.
+      - "${CESTATS_BIND:-127.0.0.1}:${CESTATS_PORT:-3100}:3100"
     environment:
-      # Required in production; the mod sends this as the x-api-key header.
-      CESTATS_API_KEY: ${CESTATS_API_KEY:?set CESTATS_API_KEY in .env}
+      # Change this before putting the site on a public address — it is the only thing
+      # standing between the internet and your database.
+      CESTATS_API_KEY: ${CESTATS_API_KEY:-cestats-change-me}
       CESTATS_SITE_URL: ${CESTATS_SITE_URL:-http://127.0.0.1:3100}
       CESTATS_DB: /data/cestats.db
+      CESTATS_SKIN_CACHE: /data/skins
     volumes:
       - cestats-data:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 25s
 
 volumes:
   cestats-data:

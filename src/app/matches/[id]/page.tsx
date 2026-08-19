@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { Head } from '@/components/Avatar'
 import Scoreboard from '@/components/Scoreboard'
 import { Card, DerivedNote, PlayerLink, Pill, SectionTitle, TeamTag } from '@/components/ui'
 import { fmtDate, fmtTime, ratio, SIDE_NAME } from '@/lib/format'
@@ -101,6 +102,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   >
                     <td className="py-2.5 pl-4">
                       <span className="flex items-center gap-2">
+                        <Head name={p.player} size={22} />
                         <TeamTag side={p.team} />
                         <PlayerLink name={p.player} className="font-medium text-ink-900" />
                       </span>
