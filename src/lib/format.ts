@@ -1,28 +1,39 @@
 import type { CSSProperties } from 'react'
 import type { Side } from './protocol'
 
-export const SIDE_NAME: Record<Side, string> = { CT: '反恐精英', T: '恐怖分子' }
+/**
+ * A team lasts the whole match; a side (CT/T) only lasts a half, because the two swap at
+ * halftime. So anything talking about a *team* — the scoreboard, the match result — is named
+ * A/B rather than by the in-game faction, which would be wrong for half the rounds.
+ */
+export const TEAM_NAME: Record<Side, string> = { CT: 'Team A', T: 'Team B' }
+export const TEAM_SHORT: Record<Side, string> = { CT: 'A', T: 'B' }
+
+/** Round-level labels, for the timeline where the faction is what actually happened. */
 export const SIDE_SHORT: Record<Side, string> = { CT: 'CT', T: 'T' }
 
-/** Rating colour scale. Anything above 1.5 gets the violet gradient treatment. */
+/** The top tier's gradient. Shared so the number and the band swatch can't drift apart. */
+export const RATING_ELITE_GRADIENT = 'linear-gradient(92deg, #0e9488, #21b95f)'
+
+/** Rating colour scale: green good, grey average, red poor, teal→green gradient above 1.5. */
 export function ratingStyle(rating: number): CSSProperties {
   if (rating > 1.5) {
     return {
-      backgroundImage: 'linear-gradient(92deg, #7c5cff, #b15cff)',
+      backgroundImage: RATING_ELITE_GRADIENT,
       WebkitBackgroundClip: 'text',
       backgroundClip: 'text',
       color: 'transparent',
     }
   }
-  if (rating >= 1.15) return { color: '#4f7dff' }
+  if (rating >= 1.15) return { color: '#1f9d63' }
   if (rating >= 0.85) return { color: '#626c85' }
   return { color: '#e5566a' }
 }
 
 /** Flat colour for bars and charts, where a gradient is not practical. */
 export function ratingColor(rating: number): string {
-  if (rating > 1.5) return '#8f5cff'
-  if (rating >= 1.15) return '#4f7dff'
+  if (rating > 1.5) return '#12b981'
+  if (rating >= 1.15) return '#1f9d63'
   if (rating >= 0.85) return '#626c85'
   return '#e5566a'
 }
@@ -30,6 +41,7 @@ export function ratingColor(rating: number): string {
 export const fmt2 = (n: number) => n.toFixed(2)
 export const fmt1 = (n: number) => n.toFixed(1)
 export const pct = (n: number) => `${Math.round(n)}%`
+export const pct1 = (n: number) => `${n.toFixed(1)}%`
 
 export function kd(kills: number, deaths: number): string {
   return deaths === 0 ? kills.toFixed(2) : (kills / deaths).toFixed(2)

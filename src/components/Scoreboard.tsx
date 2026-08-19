@@ -1,8 +1,28 @@
-import { SIDE_NAME } from '@/lib/format'
+import type { CSSProperties } from 'react'
+import { TEAM_NAME } from '@/lib/format'
 import type { MatchPlayerRow, MatchRow } from '@/lib/queries'
 import type { Side } from '@/lib/protocol'
 import { Head } from './Avatar'
 import { PlayerLink, Rating } from './ui'
+
+/**
+ * The MVP row is marked with background layers only — a star watermark bleeding out of the
+ * top-left corner plus a gold wash fading to the right. Keeping it in the background means the
+ * ornament sits *behind* the avatar instead of crowding the name, and the row stays the same
+ * height as every other one.
+ */
+const MVP_STAR = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+    '<path fill="#e0a01c" fill-opacity=".62" d="M12 1.8 14.47 8.9 21.99 9.06 15.99 13.6' +
+    ' 18.17 20.79 12 16.5 5.83 20.79 8.01 13.6 2.01 9.06 9.53 8.9Z"/></svg>',
+)}")`
+
+const MVP_ROW: CSSProperties = {
+  backgroundImage: `${MVP_STAR}, linear-gradient(90deg, rgba(245,181,68,0.30) 0%, rgba(245,181,68,0.11) 38%, rgba(245,181,68,0) 82%)`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'left -12px top -13px, left top',
+  backgroundSize: '42px 42px, 100% 100%',
+}
 
 function TeamBlock({
   side,
@@ -24,7 +44,7 @@ function TeamBlock({
     <div>
       <div className="mb-2 flex items-baseline gap-2.5 px-1">
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: accent }} />
-        <span className="text-sm font-semibold text-ink-900">{SIDE_NAME[side]}</span>
+        <span className="text-sm font-semibold text-ink-900">{TEAM_NAME[side]}</span>
         <span className="num ml-auto text-lg font-semibold" style={{ color: accent }}>
           {score}
         </span>
@@ -54,12 +74,13 @@ function TeamBlock({
                   className={`border-t border-white/70 ${
                     highlight === p.player ? 'bg-indigo-50/50' : ''
                   }`}
+                  style={p.is_mvp ? MVP_ROW : undefined}
                 >
                   <td className="py-2 pl-3">
                     <span className="flex items-center gap-2">
                       <Head name={p.player} size={22} />
-                      {p.is_mvp ? <span className="text-gold">★</span> : null}
                       <PlayerLink name={p.player} className="font-medium text-ink-900" />
+                      {p.is_mvp ? <span className="sr-only">本场 MVP</span> : null}
                     </span>
                   </td>
                   <td className="num px-2 text-right text-ink-700">
@@ -79,7 +100,7 @@ function TeamBlock({
                         className="absolute inset-y-0 right-0 -z-10 rounded-md"
                         style={{
                           width: `${(p.rating / maxRating) * 100}%`,
-                          background: 'linear-gradient(90deg, transparent, rgba(124,140,255,0.18))',
+                          background: 'linear-gradient(90deg, transparent, rgba(33,185,95,0.20))',
                         }}
                       />
                       <Rating value={p.rating} />

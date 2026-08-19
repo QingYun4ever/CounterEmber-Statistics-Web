@@ -1,12 +1,12 @@
 import Link from 'next/link'
-import { fmtDate, relative, SIDE_NAME } from '@/lib/format'
+import { fmtDate, relative, TEAM_NAME } from '@/lib/format'
 import type { MatchPlayerRow, MatchRow } from '@/lib/queries'
 import { Head } from './Avatar'
 import { Card, Pill, Rating } from './ui'
 
 const WINNER_SHORT: Record<string, string> = {
-  CT: SIDE_NAME.CT,
-  T: SIDE_NAME.T,
+  CT: TEAM_NAME.CT,
+  T: TEAM_NAME.T,
   DRAW: '平局',
   UNKNOWN: '未知',
 }
@@ -27,6 +27,9 @@ export default function MatchList({
         const players = playersByMatch.get(match.id) ?? []
         const me = perspective ? players.find((p) => p.player === perspective) : undefined
         const top = players.slice(0, 3)
+        // A partial match's score only covers the rounds we saw, so it is greyed out and
+        // labelled rather than presented as the final result.
+        const partial = !match.complete
 
         return (
           <Link key={match.id} href={`/matches/${match.id}`} className="block">
@@ -47,9 +50,22 @@ export default function MatchList({
                 ) : null}
 
                 <div className="flex items-baseline gap-2">
-                  <span className="num text-xl font-semibold text-ct">{match.ct_score}</span>
+                  <span
+                    className={`num text-xl font-semibold ${partial ? 'text-ink-400' : 'text-ct'}`}
+                  >
+                    {match.ct_score}
+                  </span>
                   <span className="text-ink-300">:</span>
-                  <span className="num text-xl font-semibold text-t">{match.t_score}</span>
+                  <span
+                    className={`num text-xl font-semibold ${partial ? 'text-ink-400' : 'text-t'}`}
+                  >
+                    {match.t_score}
+                  </span>
+                  {partial ? (
+                    <span className="num text-[11px] text-ink-400">
+                      仅 {match.rounds_observed} 回合
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="min-w-[8rem]">
@@ -58,7 +74,7 @@ export default function MatchList({
                       <>
                         {match.winner === 'DRAW' ? '平局' : me.won ? '胜利' : '失败'}
                         <span className="ml-2 text-xs font-normal text-ink-400">
-                          {me.team === 'CT' ? 'CT' : 'T'} 方
+                          {TEAM_NAME[me.team]}
                         </span>
                       </>
                     ) : (
@@ -66,7 +82,8 @@ export default function MatchList({
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-ink-400" title={fmtDate(match.ended_at)}>
-                    {relative(match.ended_at)} · {match.rounds_observed} 回合
+                    {relative(match.ended_at)}
+                    {partial ? '' : ` · ${match.rounds_observed} 回合`}
                   </div>
                 </div>
 
@@ -97,10 +114,7 @@ export default function MatchList({
                       <div key={p.player} className="flex items-center gap-1.5 text-xs">
                         <Head name={p.player} size={20} />
                         <div>
-                          <div className="flex items-center gap-1 font-medium text-ink-700">
-                            {p.is_mvp ? <span className="text-gold">★</span> : null}
-                            {p.player}
-                          </div>
+                          <div className="font-medium text-ink-700">{p.player}</div>
                           <Rating value={p.rating} className="text-xs" />
                         </div>
                       </div>
@@ -109,8 +123,8 @@ export default function MatchList({
                 )}
 
                 <div className="ml-auto flex items-center gap-2">
-                  {!match.complete ? <Pill tone="bad">部分观测</Pill> : null}
-                  {!me && match.mvp ? <Pill tone="gold">★ {match.mvp}</Pill> : null}
+                  {partial ? <Pill tone="bad">部分观测</Pill> : null}
+                  {!me && match.mvp ? <Pill tone="gold">MVP {match.mvp}</Pill> : null}
                 </div>
               </div>
             </Card>

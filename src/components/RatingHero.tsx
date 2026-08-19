@@ -1,17 +1,18 @@
-import { fmt2 } from '@/lib/format'
+import { fmt2, RATING_ELITE_GRADIENT } from '@/lib/format'
 import { Card } from './ui'
 
 /**
  * Rating bands. Widths are proportional to their share of a 0–2.0 scale so the marker's
- * position on the bar is honest rather than decorative.
+ * position on the bar is honest rather than decorative. Colours track the scale in
+ * lib/format.ts: red poor, grey average, then a green ramp.
  */
 const SCALE_MAX = 2.0
 
 const BANDS = [
   { label: '挣扎', from: 0, to: 0.85, color: '#e5566a' },
   { label: '稳定', from: 0.85, to: 1.15, color: '#8a93a8' },
-  { label: '出色', from: 1.15, to: 1.5, color: '#4f7dff' },
-  { label: '统治级', from: 1.5, to: SCALE_MAX, color: '#9f5cff' },
+  { label: '出色', from: 1.15, to: 1.5, color: '#1f9d63' },
+  { label: '统治级', from: 1.5, to: SCALE_MAX, color: '#12b981' },
 ]
 
 function bandOf(rating: number) {
@@ -39,7 +40,7 @@ export default function RatingHero({
           className="absolute inset-x-0 bottom-0 h-28 opacity-45 blur-3xl"
           style={{
             background:
-              'linear-gradient(90deg, rgba(229,86,106,.55), rgba(245,181,68,.45), rgba(79,125,255,.55), rgba(159,92,255,.55))',
+              'linear-gradient(90deg, rgba(229,86,106,.55), rgba(138,147,168,.40), rgba(31,157,99,.55), rgba(18,185,129,.55))',
           }}
         />
         <div
@@ -62,7 +63,7 @@ export default function RatingHero({
             style={
               rating > 1.5
                 ? {
-                    backgroundImage: 'linear-gradient(92deg, #7c5cff, #b15cff)',
+                    backgroundImage: RATING_ELITE_GRADIENT,
                     WebkitBackgroundClip: 'text',
                     backgroundClip: 'text',
                     color: 'transparent',

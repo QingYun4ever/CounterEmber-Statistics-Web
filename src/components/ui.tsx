@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
-import { fmt2, ratingStyle, SIDE_SHORT } from '@/lib/format'
+import { fmt2, ratingStyle, SIDE_SHORT, TEAM_SHORT } from '@/lib/format'
 import type { Side } from '@/lib/protocol'
 
 export function Card({
@@ -100,8 +100,14 @@ export function Pill({
   )
 }
 
+/** Which side a player was on in a single round. Sides swap at halftime; teams do not. */
 export function TeamTag({ side }: { side: Side }) {
   return <Pill tone={side === 'CT' ? 'ct' : 't'}>{SIDE_SHORT[side]}</Pill>
+}
+
+/** Which team a player belonged to for the whole match. See TeamTag for the per-round side. */
+export function TeamBadge({ side }: { side: Side }) {
+  return <Pill tone={side === 'CT' ? 'ct' : 't'}>{TEAM_SHORT[side]}</Pill>
 }
 
 export function PlayerLink({ name, className = '' }: { name: string; className?: string }) {

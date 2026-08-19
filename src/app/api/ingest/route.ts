@@ -1,47 +1,20 @@
-import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { saveMatch } from '@/lib/db'
+import { expectedApiKey, apiKeyMatches } from '@/lib/api-auth'
 import { computeMatchId, zMatch } from '@/lib/protocol'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** Keys shipped as defaults. Fine locally, a hole on a public address. */
-const INSECURE_KEYS = new Set(['dev-key', 'cestats-change-me'])
-let warnedAboutKey = false
-
-function expectedKey(): string | null {
-  const key = process.env.CESTATS_API_KEY
-  if (key) {
-    if (process.env.NODE_ENV === 'production' && INSECURE_KEYS.has(key) && !warnedAboutKey) {
-      warnedAboutKey = true
-      console.warn(
-        `[cestats] CESTATS_API_KEY 仍是默认值 "${key}"。站点一旦暴露到公网，任何人都能写入数据库。` +
-          ' 请设置一个随机密钥：openssl rand -hex 24',
-      )
-    }
-    return key
-  }
-  // Never fall back to a default in production — an open write endpoint is worse than a broken one.
-  return process.env.NODE_ENV === 'production' ? null : 'dev-key'
-}
-
-function keyMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false
-  const a = Buffer.from(provided)
-  const b = Buffer.from(expected)
-  return a.length === b.length && timingSafeEqual(a, b)
-}
-
 export async function POST(req: Request) {
-  const expected = expectedKey()
+  const expected = expectedApiKey()
   if (!expected) {
     return NextResponse.json(
       { ok: false, error: 'CESTATS_API_KEY is not configured; writes are refused' },
       { status: 503 },
     )
   }
-  if (!keyMatches(req.headers.get('x-api-key'), expected)) {
+  if (!apiKeyMatches(req.headers.get('x-api-key'), expected)) {
     return NextResponse.json({ ok: false, error: 'invalid api key' }, { status: 401 })
   }
 

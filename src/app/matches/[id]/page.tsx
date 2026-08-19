@@ -1,8 +1,16 @@
 import { notFound } from 'next/navigation'
 import { Head } from '@/components/Avatar'
 import Scoreboard from '@/components/Scoreboard'
-import { Card, DerivedNote, PlayerLink, Pill, SectionTitle, TeamTag } from '@/components/ui'
-import { fmtDate, fmtTime, ratio, SIDE_NAME } from '@/lib/format'
+import {
+  Card,
+  DerivedNote,
+  PlayerLink,
+  Pill,
+  SectionTitle,
+  TeamBadge,
+  TeamTag,
+} from '@/components/ui'
+import { fmtDate, fmtTime, ratio, TEAM_NAME } from '@/lib/format'
 import { getMe } from '@/lib/me-server'
 import { getMatch } from '@/lib/queries'
 import type { Side } from '@/lib/protocol'
@@ -10,8 +18,8 @@ import type { Side } from '@/lib/protocol'
 export const dynamic = 'force-dynamic'
 
 const WINNER_LABEL: Record<string, string> = {
-  CT: `${SIDE_NAME.CT} 获胜`,
-  T: `${SIDE_NAME.T} 获胜`,
+  CT: `${TEAM_NAME.CT} 获胜`,
+  T: `${TEAM_NAME.T} 获胜`,
   DRAW: '双方平局',
   UNKNOWN: '结果未知',
 }
@@ -51,7 +59,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {match.mvp ? <Pill tone="gold">★ MVP {match.mvp}</Pill> : null}
+            {match.mvp ? <Pill tone="gold">MVP {match.mvp}</Pill> : null}
             <Pill>{match.rounds_observed} 回合</Pill>
             {match.complete ? (
               <Pill tone="good">完整观测</Pill>
@@ -106,7 +114,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                     <td className="py-2.5 pl-4">
                       <span className="flex items-center gap-2">
                         <Head name={p.player} size={22} />
-                        <TeamTag side={p.team} />
+                        <TeamBadge side={p.team} />
                         <PlayerLink name={p.player} className="font-medium text-ink-900" />
                       </span>
                     </td>
@@ -137,7 +145,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       </section>
 
       <section>
-        <SectionTitle title="回合时间轴" hint={`共观测 ${rounds.length} 回合`} />
+        <SectionTitle
+          title="回合时间轴"
+          hint={`共观测 ${rounds.length} 回合 · CT / T 是该回合的阵营，半场会交换`}
+        />
         <div className="grid gap-2.5">
           {rounds.map((round, i) => {
             const roundKills = killsByRound.get(round.idx) ?? []

@@ -42,8 +42,8 @@ export function RatingTrend({
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
           <defs>
             <linearGradient id="ratingFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#7c8cff" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#7c8cff" stopOpacity={0} />
+              <stop offset="0%" stopColor="#34c98a" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="#34c98a" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="#e6e9f2" strokeDasharray="3 3" vertical={false} />
@@ -67,10 +67,10 @@ export function RatingTrend({
           <Area
             type="monotone"
             dataKey="rating"
-            stroke="#5f79ff"
+            stroke="#1f9d63"
             strokeWidth={2}
             fill="url(#ratingFill)"
-            dot={{ r: 3, strokeWidth: 0, fill: '#5f79ff' }}
+            dot={{ r: 3, strokeWidth: 0, fill: '#1f9d63' }}
             activeDot={{ r: 5 }}
           />
         </AreaChart>
@@ -88,7 +88,7 @@ export function RatingHistogram({ data }: { data: { bucket: string; count: numbe
           <XAxis dataKey="bucket" {...AXIS} />
           <YAxis {...AXIS} width={44} allowDecimals={false} />
           <Tooltip
-            cursor={{ fill: 'rgba(124,140,255,0.08)' }}
+            cursor={{ fill: 'rgba(47,163,107,0.10)' }}
             content={({ active, payload, label }) =>
               active && payload?.length ? (
                 <TooltipBox label={`Rating ${label}`} rows={[['场次', String(payload[0].value)]]} />

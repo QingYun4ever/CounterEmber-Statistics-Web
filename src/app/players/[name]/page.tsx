@@ -5,7 +5,7 @@ import MatchList from '@/components/MatchList'
 import RatingHero from '@/components/RatingHero'
 import SetMeButton from '@/components/SetMeButton'
 import { Card, DerivedNote, Kpi, Pill, PlayerLink, Rating, SectionTitle } from '@/components/ui'
-import { fmt1, fmt2, fmtDay, kd, pct, ratio } from '@/lib/format'
+import { fmt1, fmt2, fmtDay, kd, pct, pct1, ratio } from '@/lib/format'
 import { getMe } from '@/lib/me-server'
 import {
   matchesForPlayer,

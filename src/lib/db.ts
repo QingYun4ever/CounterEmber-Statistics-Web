@@ -1,3 +1,4 @@
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
@@ -76,6 +77,25 @@ CREATE TABLE IF NOT EXISTS match_uploaders (
   PRIMARY KEY (match_id, uploader)
 );
 
+CREATE TABLE IF NOT EXISTS pairing_codes (
+  code_hash  TEXT PRIMARY KEY,
+  player     TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  used_at   INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id           TEXT PRIMARY KEY,
+  token_hash   TEXT NOT NULL UNIQUE,
+  player       TEXT NOT NULL,
+  install_id   TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  revoked_at   INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_matches_ended    ON matches(ended_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mp_player        ON match_players(player);
 CREATE INDEX IF NOT EXISTS idx_kill_match_round ON kill_events(match_id, round_idx, seq);
@@ -84,6 +104,23 @@ CREATE INDEX IF NOT EXISTS idx_kill_victim      ON kill_events(victim);
 `
 
 export type Db = Database.Database
+
+export type DeviceTokenAuth = {
+  id: string
+  player: string
+  installId: string
+  lastSeenAt: number
+}
+
+export type DeviceTokenSummary = DeviceTokenAuth & {
+  createdAt: number
+  revokedAt: number | null
+}
+
+const PAIRING_CODE_TTL_MS = 15 * 60 * 1000
+const PAIRING_MAX_ATTEMPTS = 5
+const DEVICE_TOKEN_PREFIX = 'cestats-device-v1|'
+const PAIRING_CODE_PREFIX = 'cestats-pair-v1|'
 
 const globalForDb = globalThis as unknown as { __cestatsDb?: Db }
 
@@ -145,6 +182,150 @@ export function getDb(): Db {
 
   globalForDb.__cestatsDb = db
   return db
+}
+
+function digestSecret(prefix: string, value: string): string {
+  return createHash('sha256').update(prefix + value, 'utf8').digest('hex')
+}
+
+export function hashDeviceToken(token: string): string {
+  return digestSecret(DEVICE_TOKEN_PREFIX, token)
+}
+
+function hashPairingCode(code: string): string {
+  return digestSecret(PAIRING_CODE_PREFIX, code.trim().toUpperCase())
+}
+
+export function issuePairingCode(player: string, now = Date.now()): {
+  code: string
+  player: string
+  expiresAt: number
+} {
+  const db = getDb()
+  const code = randomBytes(8).toString('hex').toUpperCase()
+  const expiresAt = now + PAIRING_CODE_TTL_MS
+  db.prepare(
+    `INSERT INTO pairing_codes (code_hash, player, created_at, expires_at, attempts, used_at)
+     VALUES (?, ?, ?, ?, 0, NULL)`,
+  ).run(hashPairingCode(code), player, now, expiresAt)
+  return { code, player, expiresAt }
+}
+
+export type RedeemPairingResult = {
+  tokenId: string
+  token: string
+  player: string
+}
+
+/** Redeems a one-time code and returns the raw token exactly once. */
+export function redeemPairingCode(
+  code: string,
+  player: string,
+  installId: string,
+  now = Date.now(),
+): RedeemPairingResult | null {
+  const db = getDb()
+  const redeem = db.transaction(() => {
+    const row = db
+      .prepare(
+        `SELECT code_hash, player, expires_at, attempts, used_at
+         FROM pairing_codes WHERE code_hash = ?`,
+      )
+      .get(hashPairingCode(code)) as
+      | { code_hash: string; player: string; expires_at: number; attempts: number; used_at: number | null }
+      | undefined
+
+    if (!row || row.used_at !== null || row.expires_at <= now || row.attempts >= PAIRING_MAX_ATTEMPTS) {
+      return null
+    }
+
+    if (row.player !== player) {
+      db.prepare('UPDATE pairing_codes SET attempts = attempts + 1 WHERE code_hash = ?').run(
+        row.code_hash,
+      )
+      return null
+    }
+
+    const tokenId = randomUUID()
+    const token = randomBytes(32).toString('base64url')
+    db.prepare('UPDATE pairing_codes SET used_at = ? WHERE code_hash = ?').run(now, row.code_hash)
+    // Re-pairing this installation invalidates its previous token without affecting other devices.
+    db.prepare(
+      'UPDATE device_tokens SET revoked_at = ? WHERE install_id = ? AND revoked_at IS NULL',
+    ).run(now, installId)
+    db.prepare(
+      `INSERT INTO device_tokens
+         (id, token_hash, player, install_id, created_at, last_seen_at, revoked_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+    ).run(tokenId, hashDeviceToken(token), player, installId, now, now)
+
+    return { tokenId, token, player }
+  })
+
+  return redeem()
+}
+
+/** Looks up a token by hash and updates activity without writing on every poll request. */
+export function authenticateDeviceToken(token: string, now = Date.now()): DeviceTokenAuth | null {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT id, player, install_id, created_at, last_seen_at, revoked_at
+       FROM device_tokens WHERE token_hash = ?`,
+    )
+    .get(hashDeviceToken(token)) as
+    | {
+        id: string
+        player: string
+        install_id: string
+        created_at: number
+        last_seen_at: number
+        revoked_at: number | null
+      }
+    | undefined
+
+  if (!row || row.revoked_at !== null) return null
+  if (now - row.last_seen_at >= 60_000) {
+    db.prepare('UPDATE device_tokens SET last_seen_at = ? WHERE id = ? AND revoked_at IS NULL').run(
+      now,
+      row.id,
+    )
+  }
+  return { id: row.id, player: row.player, installId: row.install_id, lastSeenAt: now }
+}
+
+export function listDeviceTokens(): DeviceTokenSummary[] {
+  return getDb()
+    .prepare(
+      `SELECT id, player, install_id, created_at, last_seen_at, revoked_at
+       FROM device_tokens ORDER BY created_at DESC`,
+    )
+    .all()
+    .map((row) => {
+      const value = row as {
+        id: string
+        player: string
+        install_id: string
+        created_at: number
+        last_seen_at: number
+        revoked_at: number | null
+      }
+      return {
+        id: value.id,
+        player: value.player,
+        installId: value.install_id,
+        createdAt: value.created_at,
+        lastSeenAt: value.last_seen_at,
+        revokedAt: value.revoked_at,
+      }
+    })
+}
+
+export function revokeDeviceToken(id: string, now = Date.now()): boolean {
+  const result = getDb()
+    .prepare('UPDATE device_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL')
+    .run(now, id)
+  return result.changes > 0
 }
 
 export type IngestResult = {
