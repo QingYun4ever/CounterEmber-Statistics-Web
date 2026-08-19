@@ -437,7 +437,12 @@ export function authenticateAdminSession(
     .prepare('SELECT key_fp, expires_at, last_seen_at FROM admin_sessions WHERE token_hash = ?')
     .get(hash) as { key_fp: string; expires_at: number; last_seen_at: number } | undefined
 
-  if (!row || row.expires_at <= now || row.key_fp !== keyFingerprint) return false
+  if (!row || row.expires_at <= now || row.key_fp !== keyFingerprint) {
+    // Dropped rather than just rejected, so rotating the admin key kicks a console out for good
+    // instead of only until the old key comes back.
+    if (row) db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').run(hash)
+    return false
+  }
   if (now - row.last_seen_at >= 60_000) {
     db.prepare('UPDATE admin_sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?').run(
       now,
