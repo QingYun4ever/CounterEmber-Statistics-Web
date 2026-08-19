@@ -106,7 +106,7 @@ function printSelectionList(): void {
 function parseSelection(raw: string): number[] {
   const byId = new Map(suspects.map((s, index) => [s.id, index]))
   const selected = new Set<number>()
-  const tokens = raw.split(/[\s,]+/).filter(Boolean)
+  const tokens = raw.split(/[\s,，]+/).filter(Boolean)
 
   if (tokens.length === 0) throw new Error('没有输入任何编号或 ID。')
 
