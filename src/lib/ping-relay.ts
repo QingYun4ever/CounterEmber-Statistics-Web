@@ -25,6 +25,11 @@ export interface PingMarker {
 export interface PingState {
   channel: string
   revision: number
+  /**
+   * Relay clock when the snapshot was taken. createdAt/expiresAt are relay timestamps, so a client
+   * whose own clock differs must rebase them onto this value instead of comparing them directly.
+   */
+  now: number
   markers: PingMarker[]
 }
 
@@ -201,6 +206,7 @@ class PingRelay {
     return {
       channel: state.channel,
       revision: state.revision,
+      now,
       markers: [...state.markers.values()].sort((a, b) => a.createdAt - b.createdAt),
     }
   }

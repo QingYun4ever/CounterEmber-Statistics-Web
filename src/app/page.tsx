@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Head } from '@/components/Avatar'
+import HomeNotice from '@/components/HomeNotice'
 import MatchList from '@/components/MatchList'
 import { Card, Empty, Kpi, PlayerLink, Rating, SectionTitle } from '@/components/ui'
 import { fmt1, kd, pct } from '@/lib/format'
@@ -17,16 +18,21 @@ export default async function HomePage() {
 
   if (stats.matches === 0) {
     return (
-      <Empty>
-        还没有数据。启动 mod 打一把，或先跑一次{' '}
-        <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">npm run import-log</code>{' '}
-        导入日志。
-      </Empty>
+      <>
+        <HomeNotice />
+        <Empty>
+          还没有数据。启动 mod 打一把，或先跑一次{' '}
+          <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">npm run import-log</code>{' '}
+          导入日志。
+        </Empty>
+      </>
     )
   }
 
   return (
     <div className="grid gap-9">
+      <HomeNotice />
+
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">总览</h1>
         <p className="mt-1 text-sm text-ink-400">团队爆破 · 对局数据</p>

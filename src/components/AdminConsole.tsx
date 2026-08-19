@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AdminError, adminFetch, copyText, countdown } from '@/lib/admin-client'
+import { AdminError, adminFetch, countdown } from '@/lib/admin-client'
+import { copyText } from '@/lib/clipboard'
 import type { DeviceTokenSummary, PairingCodeSummary } from '@/lib/db'
 import { fmtDate, relative } from '@/lib/format'
 import { Card, Pill, SectionTitle } from './ui'

@@ -41,31 +41,6 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   return body
 }
 
-/** Clipboard API needs a secure context; a self-hosted site on plain http may not have one. */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    // Fall through to the legacy path rather than leaving the operator with nothing.
-  }
-
-  try {
-    const area = document.createElement('textarea')
-    area.value = text
-    area.setAttribute('readonly', '')
-    area.style.position = 'fixed'
-    area.style.opacity = '0'
-    document.body.appendChild(area)
-    area.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(area)
-    return ok
-  } catch {
-    return false
-  }
-}
-
 /** `4分32秒` style countdown; null once the deadline has passed. */
 export function countdown(deadline: number, now: number): string | null {
   const left = Math.floor((deadline - now) / 1000)
