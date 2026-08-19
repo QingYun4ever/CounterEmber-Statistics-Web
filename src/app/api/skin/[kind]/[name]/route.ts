@@ -58,7 +58,7 @@ async function get(url: string, as: 'json' | 'buffer'): Promise<unknown> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { 'user-agent': 'cestats/0.1 (+self-hosted stats site)' },
+      headers: { 'user-agent': 'cestats/0.2 (+self-hosted stats site)' },
       cache: 'no-store',
     })
     if (!res.ok) return null

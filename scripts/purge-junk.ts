@@ -1,110 +1,92 @@
 /**
- * Finds matches whose numbers cannot have come from the game and, when requested, lets an
- * operator choose which of those matches to delete.
+ * Lets an operator inspect all stored matches and manually delete selected records.
  *
- * Written after ~2800 fuzzed matches were pushed into the live database by something holding a
- * valid API key: rosters of CS pro nicknames with values like `60237-19-5052`, ADR 6200 and
- * Rating 44.56. The payloads passed validation because the schema only required the fields to be
- * non-negative, so nothing bounded them.
- *
- * The filter is deliberately about impossible *values* rather than "everything uploaded during
- * that hour": a time window would also take out any real match a player uploaded in the same
- * window, and it would not catch a second burst later.
- *
- * Thresholds sit far above anything this server has ever produced (real maxima, measured across
- * the genuine matches: 32 kills, ADR 240, Rating 3.82, 23 rounds), so a real match cannot trip
- * them by being unusually good.
+ * The command name is kept as `purge-junk` for compatibility, but this tool no longer assumes
+ * that a record is erroneous. It lists every match and only deletes the records explicitly chosen
+ * by the operator.
  *
  *   npm run purge-junk                    # report only, default
- *   npm run purge-junk -- --apply          # list suspects and interactively choose deletions
- *   npm run purge-junk -- --select         # same as --apply
+ *   npm run purge-junk -- --select         # list all matches and interactively choose deletions
+ *   npm run purge-junk -- --apply          # same as --select, kept for compatibility
  */
 import { stdin as input, stdout as output } from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { getDb } from '../src/lib/db'
 
-const LIMITS = {
-  rating: 5,
-  adr: 400,
-  kills: 60,
-  deaths: 60,
-  assists: 60,
-  rounds: 40,
-}
-
 const interactive = process.argv.includes('--apply') || process.argv.includes('--select')
 const db = getDb()
 
-interface Suspect {
+interface MatchRow {
   id: string
+  server: string
+  uploader: string
   ended_at: number
   created_at: number
-  uploader: string
-  rounds_observed: number
+  winner: string
   ct_score: number
   t_score: number
-  worst: string | null
+  rounds_observed: number
+  complete: number
+  kill_count: number
+  player_count: number
+  top_player: string | null
 }
 
-const suspects = db
+const matches = db
   .prepare(
-    `SELECT m.id, m.ended_at, m.created_at, m.uploader, m.rounds_observed, m.ct_score, m.t_score,
+    `SELECT m.id, m.server, m.uploader, m.ended_at, m.created_at, m.winner,
+            m.ct_score, m.t_score, m.rounds_observed, m.complete, m.kill_count,
+            (SELECT COUNT(*) FROM match_players p WHERE p.match_id = m.id) AS player_count,
             (SELECT p.player || ' ' || p.kills || '-' || p.deaths || '-' || p.assists ||
                     '  ADR ' || p.adr || '  Rating ' || p.rating
                FROM match_players p
               WHERE p.match_id = m.id
-              ORDER BY p.rating DESC LIMIT 1) AS worst
+              ORDER BY p.rating DESC LIMIT 1) AS top_player
        FROM matches m
-      WHERE m.rounds_observed > @rounds
-         OR EXISTS (
-              SELECT 1 FROM match_players p
-               WHERE p.match_id = m.id
-                 AND (p.rating > @rating OR p.adr > @adr
-                      OR p.kills > @kills OR p.deaths > @deaths OR p.assists > @assists))
       ORDER BY m.created_at`,
   )
-  .all(LIMITS) as Suspect[]
+  .all() as MatchRow[]
 
 const total = (db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number }).n
 
+function dateOf(timestamp: number): string {
+  return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : '无时间'
+}
+
 function printReport(): void {
-  // Uploads arrive one at a time in normal use; a burst is itself a strong signal, so show it.
-  const byUploader = new Map<string, number>()
-  for (const s of suspects) byUploader.set(s.uploader, (byUploader.get(s.uploader) ?? 0) + 1)
-
-  console.log(`共 ${total} 场，其中 ${suspects.length} 场数值不可能：\n`)
-  console.log('按上报者:')
-  for (const [uploader, n] of [...byUploader].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${String(n).padStart(5)}  ${uploader}`)
+  console.log(`数据库中共有 ${total} 场比赛。`)
+  if (matches.length !== total) {
+    console.log(`当前读取到 ${matches.length} 场；数据可能在扫描期间发生了变化。`)
   }
 
-  const first = suspects[0]
-  const last = suspects[suspects.length - 1]
-  console.log(
-    `\n写入时间: ${new Date(first.created_at).toLocaleString()} — ${new Date(last.created_at).toLocaleString()}`,
-  )
-
-  console.log('\n样本:')
-  for (const s of suspects.slice(0, 5)) {
-    console.log(`  ${s.id}  ${s.ct_score}:${s.t_score}  ${s.rounds_observed} 回合  ${s.worst ?? '无玩家数据'}`)
+  if (matches.length > 0) {
+    console.log(`时间范围: ${dateOf(matches[0].created_at)} — ${dateOf(matches[matches.length - 1].created_at)}`)
+    console.log('\n示例记录:')
+    for (const match of matches.slice(0, 5)) {
+      console.log(
+        `  ${match.id}  ${dateOf(match.created_at)}  ${match.ct_score}:${match.t_score}  ` +
+          `${match.rounds_observed} 回合 / ${match.kill_count} 击杀  ${match.uploader}`,
+      )
+    }
+    if (matches.length > 5) console.log(`  ... 另外 ${matches.length - 5} 场`)
   }
-  if (suspects.length > 5) console.log(`  ... 另外 ${suspects.length - 5} 场`)
-
-  console.log(`\n如果全部删除，将保留 ${total - suspects.length} 场。`)
 }
 
 function printSelectionList(): void {
-  console.log('\n可选择删除的记录（编号从 1 开始）:')
-  for (const [index, s] of suspects.entries()) {
+  console.log(`\n全部比赛记录（共 ${matches.length} 场，编号按创建时间从早到晚）:`)
+  for (const [index, match] of matches.entries()) {
     console.log(
-      `  ${String(index + 1).padStart(4)}  ${s.id}  ${new Date(s.created_at).toLocaleString()}  ` +
-        `${s.ct_score}:${s.t_score}  ${s.rounds_observed} 回合  ${s.uploader}  ${s.worst ?? '无玩家数据'}`,
+      `  ${String(index + 1).padStart(4)}  ${match.id}  ${dateOf(match.created_at)}  ` +
+        `${match.server}  ${match.ct_score}:${match.t_score}  ` +
+        `${match.rounds_observed} 回合 / ${match.kill_count} 击杀 / ${match.player_count} 玩家  ` +
+        `${match.uploader}  ${match.complete ? '完整' : '未完整'}  ` +
+        `${match.top_player ?? ''}`,
     )
   }
 }
 
 function parseSelection(raw: string): number[] {
-  const byId = new Map(suspects.map((s, index) => [s.id, index]))
+  const byId = new Map(matches.map((match, index) => [match.id, index]))
   const selected = new Set<number>()
   const tokens = raw.split(/[\s,，]+/).filter(Boolean)
 
@@ -115,8 +97,8 @@ function parseSelection(raw: string): number[] {
     if (range) {
       const from = Number(range[1])
       const to = Number(range[2])
-      if (from < 1 || to > suspects.length || from > to) {
-        throw new Error(`编号范围无效：${token}（有效范围是 1-${suspects.length}）。`)
+      if (from < 1 || to > matches.length || from > to) {
+        throw new Error(`编号范围无效：${token}（有效范围是 1-${matches.length}）。`)
       }
       for (let index = from; index <= to; index++) selected.add(index - 1)
       continue
@@ -124,8 +106,8 @@ function parseSelection(raw: string): number[] {
 
     if (/^\d+$/.test(token)) {
       const index = Number(token)
-      if (index < 1 || index > suspects.length) {
-        throw new Error(`编号无效：${token}（有效范围是 1-${suspects.length}）。`)
+      if (index < 1 || index > matches.length) {
+        throw new Error(`编号无效：${token}（有效范围是 1-${matches.length}）。`)
       }
       selected.add(index - 1)
       continue
@@ -139,7 +121,7 @@ function parseSelection(raw: string): number[] {
   return [...selected].sort((a, b) => a - b)
 }
 
-async function chooseSuspects(): Promise<Suspect[] | null> {
+async function chooseMatches(): Promise<MatchRow[] | null> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error('\n--apply/--select 需要在交互式终端中运行，为安全起见本次未删除任何数据。')
     console.error('请直接在终端运行：npm run purge-junk -- --select')
@@ -159,13 +141,14 @@ async function chooseSuspects(): Promise<Suspect[] | null> {
 
       try {
         const indexes = parseSelection(answer)
-        const selected = indexes.map((index) => suspects[index])
+        const selected = indexes.map((index) => matches[index])
 
         console.log(`\n已选择 ${selected.length} 场：`)
-        for (const [index, s] of selected.map((s) => [suspects.indexOf(s), s] as const)) {
+        for (const index of indexes) {
+          const match = matches[index]
           console.log(
-            `  ${index + 1}  ${s.id}  ${new Date(s.created_at).toLocaleString()}  ` +
-              `${s.ct_score}:${s.t_score}  ${s.rounds_observed} 回合  ${s.uploader}`,
+            `  ${index + 1}  ${match.id}  ${dateOf(match.created_at)}  ` +
+              `${match.ct_score}:${match.t_score}  ${match.rounds_observed} 回合  ${match.uploader}`,
           )
         }
 
@@ -184,21 +167,21 @@ async function chooseSuspects(): Promise<Suspect[] | null> {
   }
 }
 
-if (suspects.length === 0) {
-  console.log(`${total} 场比赛，没有发现异常数据。`)
+if (matches.length === 0) {
+  console.log('数据库中没有比赛记录。')
 } else {
   printReport()
 
   if (!interactive) {
-    console.log('\n这是预演。确认具体记录后运行 --select 手动选择并删除。')
+    console.log('\n这是预演。需要手动删除时运行 --select。')
   } else {
-    const selected = await chooseSuspects()
+    const selected = await chooseMatches()
     if (selected && selected.length > 0) {
       const drop = db.prepare('DELETE FROM matches WHERE id = ?')
-      const run = db.transaction((rows: Suspect[]) => {
+      const run = db.transaction((rows: MatchRow[]) => {
         let deleted = 0
         // match_players / rounds / kill_events / match_uploaders all cascade off matches.
-        for (const s of rows) deleted += drop.run(s.id).changes
+        for (const match of rows) deleted += drop.run(match.id).changes
         return deleted
       })
       const deleted = run(selected)

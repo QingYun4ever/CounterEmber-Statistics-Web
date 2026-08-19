@@ -31,7 +31,7 @@ export function modDir(): string {
 
 /** Deliberately narrow: these names end up in a Content-Disposition header. */
 const FILE_RE = /^[A-Za-z0-9._+-]+\.jar$/
-/** `cestats-mc1.21.4-0.1.0+mc1.21.4.jar` */
+/** `cestats-mc1.21.4-0.2.0+mc1.21.4.jar` */
 const NAME_RE = /^cestats-mc([\d.]+)-(.+?)\+mc[\d.]+\.jar$/
 
 export function isDownloadableName(file: string): boolean {
