@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { copyText } from '@/lib/clipboard'
+import { QQ_GROUP } from '@/lib/site'
 
 /**
  * First-visit disclaimer on the homepage.
@@ -13,8 +14,6 @@ import { copyText } from '@/lib/clipboard'
  */
 const FOREVER_KEY = 'cestats_notice_v2_dismissed'
 const SESSION_KEY = 'cestats_notice_v2_seen'
-
-const QQ_GROUP = '684090438'
 
 export default function HomeNotice() {
   // Never true on the server: the flags live in the browser, so the first paint has no dialog and

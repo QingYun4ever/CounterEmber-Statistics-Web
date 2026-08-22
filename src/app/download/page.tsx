@@ -1,6 +1,7 @@
 import { Card, Empty, SectionTitle } from '@/components/ui'
 import { fmtDate } from '@/lib/format'
 import { fmtBytes, modReleases } from '@/lib/mod-releases'
+import { QQ_GROUP } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,19 +103,20 @@ export default function DownloadPage() {
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">3</span>
               <span>
-                进游戏后向站长要一个<strong className="font-medium">一次性配对码</strong>，执行{' '}
-                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">
-                  /cestats pair &lt;配对码&gt;
-                </code>
-                。配对码 15 分钟内有效、只能用一次，而且只有你这个 ID 能用；配对后本机才会上传数据。
+                进游戏后执行{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats bind</code>
+                ，聊天栏会给你一个 6 位<strong className="font-medium">绑定码</strong>（点一下就复制）。
+                取码不需要审批，站点当场就发。
               </span>
             </li>
             <li className="flex gap-3">
               <span className="num shrink-0 text-ink-300">4</span>
               <span>
-                官方统计服务器不需要改地址。如是自部署统计站点，用{' '}
-                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/cestats url</code>{' '}
-                填自己的站点地址再配对；装了 Mod Menu 的话也可以在它的设置界面里改。
+                在 QQ 群 <span className="num font-medium text-ink-900">{QQ_GROUP}</span> 里发{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">/配对 &lt;绑定码&gt;</code>
+                ，机器人核对后批准，客户端 5 秒内自己完成配对，不用再输入任何东西。
+                绑定码 20 分钟有效，<strong className="font-medium">可以公开发在群里</strong>——
+                它只是一张申领单，设备令牌是站点直接回给你这台客户端的。
               </span>
             </li>
             <li className="flex gap-3">
@@ -126,10 +128,22 @@ export default function DownloadPage() {
             </li>
           </ol>
 
-          <p className="mt-5 border-t border-white/60 pt-4 text-xs text-ink-400">
-            mod 只在客户端运行，
-            读的是聊天框里的赛后播报，不读内存也不改游戏行为，不存在作弊行为。
-          </p>
+          <div className="mt-5 grid gap-2 border-t border-white/60 pt-4 text-xs text-ink-400">
+            <p>
+              mod 只在客户端运行，
+              读的是聊天框里的赛后播报，不读内存也不改游戏行为，不存在作弊行为。
+            </p>
+            <p>
+              进不了游戏、或者不想用 QQ 群：向站长要一个<strong className="font-medium">一次性配对码</strong>，
+              执行 <code className="rounded bg-white/70 px-1.5 py-0.5">/cestats pair &lt;配对码&gt;</code>。
+              配对码 15 分钟有效、只能用一次，且只有你这个 ID 能用。
+            </p>
+            <p>
+              官方统计服务器不需要改地址。自部署统计站点的话，用{' '}
+              <code className="rounded bg-white/70 px-1.5 py-0.5">/cestats url</code>{' '}
+              填自己的地址再配对；装了 Mod Menu 也可以在它的设置界面里改。
+            </p>
+          </div>
         </Card>
       </section>
     </div>
