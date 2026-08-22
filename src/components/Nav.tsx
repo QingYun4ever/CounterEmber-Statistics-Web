@@ -54,7 +54,7 @@ export default function Nav({ me }: { me: string | null }) {
                     : 'text-ink-500 hover:bg-white/50 hover:text-ink-700'
                 }`}
               >
-                {link.label}
+                {link.href === '/me' && !me ? '我的' : link.label}
                 {link.href === '/me' && me ? (
                   <span className="ml-1.5 text-[11px] text-ink-300">{me}</span>
                 ) : null}

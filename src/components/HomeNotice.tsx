@@ -11,8 +11,8 @@ import { copyText } from '@/lib/clipboard'
  * 「不再提醒」 is permanent (localStorage). The key is versioned so a materially different notice
  * can be shown again later without stranding people who already clicked the permanent option.
  */
-const FOREVER_KEY = 'cestats_notice_v1_dismissed'
-const SESSION_KEY = 'cestats_notice_v1_seen'
+const FOREVER_KEY = 'cestats_notice_v2_dismissed'
+const SESSION_KEY = 'cestats_notice_v2_seen'
 
 const QQ_GROUP = '684090438'
 
@@ -86,13 +86,12 @@ export default function HomeNotice() {
 
         <div className="mt-4 grid gap-3 text-sm leading-relaxed text-ink-700">
           <p>
-            本站<strong className="font-semibold">不是 IMC 官方站点</strong>，也不隶属于 IMC
-            团队，这里的数据不代表官方战绩。
+            本站<strong className="font-semibold">不是 IMC 官方站点</strong>，数据不代表官方战绩。
           </p>
           <p>
-            所有对局都由装了 CE Stats mod 的玩家在赛后
+            所有对局都由装了 CE Stats mod 的玩家赛后
             <strong className="font-semibold">自行上传</strong>
-            ，本站不对数据的真实性做任何保证；上传者当时看到的信息不全时，比赛数据也可能有缺漏。
+            ，本站不保证其真实性；上传者当时没看全的比赛也会有缺漏。
           </p>
         </div>
 
@@ -100,32 +99,55 @@ export default function HomeNotice() {
           <p className="text-xs font-medium uppercase tracking-[0.09em] text-ink-400">
             想让自己的比赛也出现在这里
           </p>
-          <p className="mt-2 text-sm text-ink-700">
-            上传需要一个一次性配对码。加 QQ 群{' '}
-            <button
-              type="button"
-              onClick={copyGroup}
-              title="点击复制群号"
-              className="num rounded-md bg-white/80 px-1.5 py-0.5 font-semibold text-ink-900 transition-colors hover:bg-white"
-            >
-              {copied ? '已复制' : QQ_GROUP}
-            </button>{' '}
-            找站长要，或者联系任何认识 <span className="font-medium">PaperNotFound</span> 的人。
-          </p>
-          <p className="mt-2 text-xs text-ink-400">
-            mod 在{' '}
-            <Link
-              href="/download"
-              onClick={() => close(false)}
-              className="text-accent hover:underline"
-            >
-              下载
-            </Link>{' '}
-            页；拿到码后进游戏执行{' '}
-            <code className="rounded bg-white/70 px-1.5 py-0.5">
-              /cestats pair &lt;配对码&gt;
-            </code>
-            。
+          <ol className="mt-2.5 grid gap-2 text-sm text-ink-700">
+            <li className="flex gap-2.5">
+              <span className="num mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink-900/85 text-[10px] font-semibold text-white">
+                1
+              </span>
+              <span>
+                装上 mod（在{' '}
+                <Link
+                  href="/download"
+                  onClick={() => close(false)}
+                  className="text-accent hover:underline"
+                >
+                  下载
+                </Link>{' '}
+                页）。
+              </span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="num mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink-900/85 text-[10px] font-semibold text-white">
+                2
+              </span>
+              <span>
+                游戏里执行{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5">/cestats bind</code>
+                ，拿一个 6 位绑定码。
+              </span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="num mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink-900/85 text-[10px] font-semibold text-white">
+                3
+              </span>
+              <span>
+                在 QQ 群{' '}
+                <button
+                  type="button"
+                  onClick={copyGroup}
+                  title="点击复制群号"
+                  className="num rounded-md bg-white/80 px-1.5 py-0.5 font-semibold text-ink-900 transition-colors hover:bg-white"
+                >
+                  {copied ? '已复制' : QQ_GROUP}
+                </button>{' '}
+                发{' '}
+                <code className="rounded bg-white/70 px-1.5 py-0.5">/配对 绑定码</code>
+                ，机器人批准后游戏里会自动配对完成。
+              </span>
+            </li>
+          </ol>
+          <p className="mt-2.5 text-xs text-ink-400">
+            绑定码 20 分钟有效，可以直接发在群里——它只是一张申领单，不是凭据。
           </p>
         </div>
 

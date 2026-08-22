@@ -77,6 +77,8 @@ export default function MatchList({
                           {TEAM_NAME[me.team]}
                         </span>
                       </>
+                    ) : match.winner === 'DRAW' ? (
+                      '平局'
                     ) : (
                       `${WINNER_SHORT[match.winner]} 获胜`
                     )}
